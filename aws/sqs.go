@@ -88,6 +88,7 @@ func NewSQSConsumer(
 ) (*SQSConsumer, error) {
 
 	cfg, err := config.LoadDefaultConfig(context.Background())
+
 	if err != nil {
 		return nil, fmt.Errorf("unable to load AWS config: %w", err)
 	}
@@ -131,15 +132,6 @@ func (c *SQSConsumer) Consume(ctx context.Context, processMessage func(ctx conte
 			continue
 		}
 
-		// if err = c.pool.Submit(func() {
-		// 	err := processMessages(client, ctx, messageBatch)
-		// 	if err != nil {
-		// 		log.Error().Msgf("error processing messages: %v", err)
-		// 	}
-		// }); err != nil {
-		// 	log.Error().Msgf("failed to submit processMessages: %v", err)
-		// }
-
 		// process each message individually using the worker pool
 		for _, message := range messageBatch.Messages {
 			submitErr := c.pool.Submit(func() {
@@ -171,21 +163,21 @@ func (c *SQSConsumer) Close() {
 }
 
 func NewSQSJobConsumer(consumer *SQSConsumer,
-	jobHandler jobs.JobQueue,
+
 ) *SQSJobConsumer {
 
 	return &SQSJobConsumer{
-		Consumer:   consumer,
-		JobHandler: jobHandler,
+		Consumer: consumer,
 	}
 }
 
 // Consume starts consuming messages from the SQS queue.
 // This is a long-running function that continuously polls the queue for messages.
-func (c *SQSJobConsumer) Consume(ctx context.Context) {
+func (c *SQSJobConsumer) Consume(ctx context.Context, processJob func(ctx context.Context, job *jobs.Job) error) {
 	c.Consumer.Consume(ctx, func(ctx context.Context, message sqstypes.Message) error {
 
 		messageID := "<unknown>"
+
 		if message.MessageId != nil {
 			messageID = *message.MessageId
 		}
@@ -196,12 +188,13 @@ func (c *SQSJobConsumer) Consume(ctx context.Context) {
 		}
 
 		var m jobs.Job
+
 		if err := json.Unmarshal([]byte(*message.Body), &m); err != nil {
 			return fmt.Errorf("decode message %s: %w", messageID, err)
 		}
 
-		if err := c.JobHandler.SendJob(ctx, &m); err != nil {
-			return fmt.Errorf("send message %s: %w", messageID, err)
+		if err := processJob(ctx, &m); err != nil {
+			return fmt.Errorf("process job %s: %w", messageID, err)
 		}
 
 		if err := c.Consumer.DeleteMessage(ctx, message); err != nil {
@@ -230,22 +223,12 @@ func (c *SQSJobConsumer) Consume(ctx context.Context) {
 // }
 
 func NewSQSJobQueue(client *sqs.Client, queueUrl string) *SQSJobQueue {
-	// ctx := context.Background()
-
-	// // Load AWS config (region and credentials)
-	// cfg, err := config.LoadDefaultConfig(ctx)
-	// if err != nil {
-	// 	log.Fatal().Msgf("unable to load SDK config: %v", err)
-	// }
-
-	//sqs := sqs.NewFromConfig(cfg)
-
 	sender := NewSQSSender(client, queueUrl)
 
 	return &SQSJobQueue{Sender: sender}
 }
 
-// SendMail sends an email message to the SQS queue.
+// Sends a job message to the SQS queue.
 // The message is serialized as JSON and includes message attributes.
 func (queue *SQSJobQueue) SendJob(ctx context.Context, job *jobs.Job) error {
 
@@ -256,19 +239,6 @@ func (queue *SQSJobQueue) SendJob(ctx context.Context, job *jobs.Job) error {
 	}
 
 	err = queue.Sender.Send(ctx, body)
-
-	// Send to SQS
-	// _, err = queue.client.SendMessage(ctx, &sqs.SendMessageInput{
-	// 	QueueUrl:    aws.String(queue.client.QueueUrl()),
-	// 	MessageBody: aws.String(string(body)),
-	// 	// Optional: add message attributes
-	// 	MessageAttributes: map[string]sqstypes.MessageAttributeValue{
-	// 		"type": {
-	// 			DataType:    AwsTypeString,
-	// 			StringValue: AwsEmailValue,
-	// 		},
-	// 	},
-	// })
 
 	return err
 }
