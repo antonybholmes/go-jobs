@@ -11,7 +11,6 @@ import (
 
 	"github.com/antonybholmes/go-sys"
 	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
 	sqstypes "github.com/aws/aws-sdk-go-v2/service/sqs/types"
 	"github.com/panjf2000/ants"
@@ -44,6 +43,7 @@ type (
 	}
 )
 
+// NewSQSSender creates a new instance of SQSSender with the given SQS client and queue URL.
 func NewSQSSender(client *sqs.Client, queueURL string) *SQSSender {
 	return &SQSSender{
 		Client:   client,
@@ -85,21 +85,21 @@ func NewSQSConsumer(
 	queueURL string,
 	threads int,
 	waitTimeSecs int,
-) (*SQSConsumer, error) {
+	client *sqs.Client) (*SQSConsumer, error) {
 
-	cfg, err := config.LoadDefaultConfig(context.Background())
+	// cfg, err := config.LoadDefaultConfig(context.Background())
 
-	if err != nil {
-		return nil, fmt.Errorf("unable to load AWS config: %w", err)
-	}
+	// if err != nil {
+	// 	return nil, fmt.Errorf("unable to load AWS config: %w", err)
+	// }
+
+	// client := sqs.NewFromConfig(cfg)
 
 	pool, err := ants.NewPool(threads)
 
 	if err != nil {
 		return nil, fmt.Errorf("unable to create worker pool with threads %d: %w", threads, err)
 	}
-
-	client := sqs.NewFromConfig(cfg)
 
 	return &SQSConsumer{
 		QueueURL:     queueURL,
