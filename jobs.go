@@ -71,6 +71,7 @@ type (
 	}
 
 	// MailQueue defines the interface for sending mail items to a queue
+	// This is implemented concretely in the go-mail package.
 	MailQueue interface {
 		SendMail(ctx context.Context, mail *MailItem) error
 	}
