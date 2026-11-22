@@ -81,11 +81,11 @@ func (s *SQSSender) SendFifo(ctx context.Context,
 	return nil
 }
 
-func NewSQSConsumer(
+func NewSQSConsumer(client *sqs.Client,
 	queueURL string,
 	threads int,
 	waitTimeSecs int,
-	client *sqs.Client) (*SQSConsumer, error) {
+) (*SQSConsumer, error) {
 
 	// cfg, err := config.LoadDefaultConfig(context.Background())
 

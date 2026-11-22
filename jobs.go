@@ -7,10 +7,17 @@ import (
 )
 
 type (
+	JobUser struct {
+		ID    string `json:"id"`
+		Email string `json:"email,omitempty"`
+		Name  string `json:"name,omitempty"`
+	}
+
 	// Represents a job, but without the specific details of the work to be processed.
 	// This is more for recording job metadata such as sending an email where
 	// details such as an S3 bucket or file key are not necessary.
 	BaseJob struct {
+		User      JobUser   `json:"user"`
 		CreatedAt time.Time `json:"createdAt"`
 		ID        string    `json:"id"`
 		// Name of the job, if applicable.
@@ -47,7 +54,7 @@ type (
 		Data     string `json:"data"`
 	}
 
-	MailItem struct {
+	QueueMailItem struct {
 		Payload *Payload `json:"payload,omitempty"`
 		Job     *BaseJob `json:"job,omitempty"`
 		// Name of the user, if applicable.
@@ -64,28 +71,46 @@ type (
 	// MailQueue defines the interface for sending mail items to a queue
 	// This is implemented concretely in the go-mail package.
 	MailQueue interface {
-		SendMail(ctx context.Context, mail *MailItem) error
+		SendMail(ctx context.Context, mail *QueueMailItem) error
 	}
 
 	EmailType string
+
+	JobStatus string
 )
 
 const (
-	EmailTypeJobSubmitted  EmailType = "job-submitted"
-	EmailTypeJobQueued     EmailType = "job-queued"
-	EmailTypeJobStarted    EmailType = "job-started"
-	EmailTypeJobError      EmailType = "job-error"
-	EmailTypeJobCancelled  EmailType = "job-cancelled"
-	EmailTypeJobInProgress EmailType = "job-in-progress"
-	EmailTypeJobFailed     EmailType = "job-failed"
-	EmailTypeJobComplete   EmailType = "job-complete"
+	JobStatusSubmitted JobStatus = "submitted"
+	JobStatusQueued    JobStatus = "queued"
+	JobStatusStarted   JobStatus = "started"
+	JobStatusError     JobStatus = "error"
+	JobStatusCancelled JobStatus = "cancelled"
+	JobStatusFailed    JobStatus = "failed"
+	JobStatusCompleted JobStatus = "completed"
+
+	EmailTypeJobSubmitted EmailType = "job-submitted"
+	EmailTypeJobQueued    EmailType = "job-queued"
+	EmailTypeJobStarted   EmailType = "job-started"
+	EmailTypeJobError     EmailType = "job-error"
+	EmailTypeJobCancelled EmailType = "job-cancelled"
+	EmailTypeJobFailed    EmailType = "job-failed"
+	EmailTypeJobCompleted EmailType = "job-completed"
 )
 
-func NewJobSubmittedMailItem(job *BaseJob, userID, to string) *MailItem {
-	return &MailItem{
-		UserID:    userID,
+func NewJobSubmittedMailItem(job *BaseJob) *QueueMailItem {
+	return &QueueMailItem{
+		UserID:    job.User.ID,
 		Job:       job,
-		To:        to,
+		To:        job.User.Email,
 		EmailType: EmailTypeJobSubmitted,
+	}
+}
+
+func NewJobStatusMailItem(jobID string, jobType string, userID string, email string, status JobStatus) *QueueMailItem {
+	return &QueueMailItem{
+		UserID:    userID,
+		Job:       &BaseJob{ID: jobID, Type: jobType},
+		To:        email,
+		EmailType: EmailType("job-" + string(status)),
 	}
 }
