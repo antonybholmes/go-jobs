@@ -54,7 +54,8 @@ type (
 		Data     string `json:"data"`
 	}
 
-	QueueMailItem struct {
+	// Sent on a queue to an email handler for processing.
+	MailQueueItem struct {
 		Payload *Payload `json:"payload,omitempty"`
 		Job     *BaseJob `json:"job,omitempty"`
 		// Name of the user, if applicable.
@@ -71,7 +72,7 @@ type (
 	// MailQueue defines the interface for sending mail items to a queue
 	// This is implemented concretely in the go-mail package.
 	MailQueue interface {
-		SendMail(ctx context.Context, mail *QueueMailItem) error
+		SendMail(ctx context.Context, mail *MailQueueItem) error
 	}
 
 	EmailType string
@@ -97,8 +98,8 @@ const (
 	EmailTypeJobCompleted EmailType = "job-completed"
 )
 
-func NewJobSubmittedMailItem(job *BaseJob) *QueueMailItem {
-	return &QueueMailItem{
+func NewJobSubmittedMailItem(job *BaseJob) *MailQueueItem {
+	return &MailQueueItem{
 		UserID:    job.User.ID,
 		Job:       job,
 		To:        job.User.Email,
@@ -106,8 +107,8 @@ func NewJobSubmittedMailItem(job *BaseJob) *QueueMailItem {
 	}
 }
 
-func NewJobStatusMailItem(jobID string, jobType string, userID string, email string, status JobStatus) *QueueMailItem {
-	return &QueueMailItem{
+func NewJobStatusMailItem(jobID string, jobType string, userID string, email string, status JobStatus) *MailQueueItem {
+	return &MailQueueItem{
 		UserID:    userID,
 		Job:       &BaseJob{ID: jobID, Type: jobType},
 		To:        email,
