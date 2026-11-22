@@ -29,15 +29,6 @@ type (
 		Size        int64  `json:"size"`
 	}
 
-	// SubmitHandler handles the submission of jobs, including validating metadata,
-	// uploading files to the object store, and sending jobs to the job queue.
-	SubmitHandler struct {
-		jobQueue    JobQueue
-		objectStore ObjectStore
-		bucket      string
-		maxBody     int64
-	}
-
 	// MailQueue defines the interface for sending mail items to a queue
 	JobQueue interface {
 		SendJob(ctx context.Context, job *Job) error
