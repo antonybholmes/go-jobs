@@ -4,13 +4,21 @@ import (
 	"context"
 	"io"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 type (
+	JobStatus   string
+	JobFileType string
+
 	JobUser struct {
-		ID    string `json:"id"`
-		Email string `json:"email,omitempty"`
-		Name  string `json:"name,omitempty"`
+		// Unique identifier for the user.
+		ID string `json:"id"`
+		// Email address of the user.
+		Email string `json:"email"`
+		// Name of the user. If not provided, email will be used as the display name.
+		Name string `json:"name,omitempty"`
 	}
 
 	// Represents a job, but without the specific details of the work to be processed.
@@ -26,14 +34,37 @@ type (
 		Description string `json:"description,omitempty"`
 	}
 
+	JobFile struct {
+		ID string `json:"id"`
+		// Whether input or output file.
+		Type        JobFileType `json:"type"`
+		Bucket      string      `json:"bucket"`
+		Key         string      `json:"key"`
+		Filename    string      `json:"filename"`
+		ContentType string      `json:"contentType"`
+		Size        int64       `json:"size"`
+		CreatedAt   time.Time   `json:"createdAt"`
+		// The content of the file.
+		Content io.ReadSeeker `json:"-"`
+	}
+
 	// Job represents a unit of work to be processed.
 	Job struct {
 		BaseJob
-		Bucket      string `json:"bucket"`
-		Key         string `json:"key"`
-		Filename    string `json:"filename"`
-		ContentType string `json:"contentType"`
-		Size        int64  `json:"size"`
+		Files []*JobFile `json:"files,omitempty"`
+	}
+
+	JobStatusQueueItem struct {
+		// The ID of the job this status update pertains to.
+		ID string `json:"jobId"`
+		// The type of the job.
+		Status JobStatus `json:"status"`
+		// An optional message providing additional context about the job status.
+		Message string `json:"message,omitempty"`
+		// The files created in the s3 bucket as a result of this job.
+		Files []*JobFile `json:"files,omitempty"`
+		// The mode in which the job was executed, if applicable.
+		UpdatedAt time.Time `json:"updatedAt"`
 	}
 
 	// MailQueue defines the interface for sending mail items to a queue
@@ -46,41 +77,19 @@ type (
 	}
 
 	ObjectStore interface {
-		Upload(ctx context.Context, job *Job, body io.ReadSeeker) error
+		Upload(ctx context.Context, job *Job) error
 	}
 
 	Payload struct {
 		DataType string `json:"dataType"`
 		Data     string `json:"data"`
 	}
-
-	// Sent on a queue to an email handler for processing.
-	MailQueueItem struct {
-		Payload *Payload `json:"payload,omitempty"`
-		Job     *BaseJob `json:"job,omitempty"`
-		// Name of the user, if applicable.
-		UserID    string    `json:"userId,omitempty"`
-		Name      string    `json:"name,omitempty"`
-		To        string    `json:"to"`
-		From      string    `json:"from"`
-		EmailType EmailType `json:"type"`
-		TTL       string    `json:"ttl,omitempty"`
-		LinkUrl   string    `json:"linkUrl,omitempty"`
-		Mode      string    `json:"mode,omitempty"`
-	}
-
-	// MailQueue defines the interface for sending mail items to a queue
-	// This is implemented concretely in the go-mail package.
-	MailQueue interface {
-		SendMail(ctx context.Context, mail *MailQueueItem) error
-	}
-
-	EmailType string
-
-	JobStatus string
 )
 
 const (
+	JobFileTypeInput  JobFileType = "input"
+	JobFileTypeOutput JobFileType = "output"
+
 	JobStatusSubmitted JobStatus = "submitted"
 	JobStatusQueued    JobStatus = "queued"
 	JobStatusStarted   JobStatus = "started"
@@ -88,30 +97,43 @@ const (
 	JobStatusCancelled JobStatus = "cancelled"
 	JobStatusFailed    JobStatus = "failed"
 	JobStatusCompleted JobStatus = "completed"
-
-	EmailTypeJobSubmitted EmailType = "job-submitted"
-	EmailTypeJobQueued    EmailType = "job-queued"
-	EmailTypeJobStarted   EmailType = "job-started"
-	EmailTypeJobError     EmailType = "job-error"
-	EmailTypeJobCancelled EmailType = "job-cancelled"
-	EmailTypeJobFailed    EmailType = "job-failed"
-	EmailTypeJobCompleted EmailType = "job-completed"
 )
 
-func NewJobSubmittedMailItem(job *BaseJob) *MailQueueItem {
-	return &MailQueueItem{
-		UserID:    job.User.ID,
-		Job:       job,
-		To:        job.User.Email,
-		EmailType: EmailTypeJobSubmitted,
+func NewJobStatusQueueItem(jobID string, status JobStatus, message string, files []*JobFile) *JobStatusQueueItem {
+	return &JobStatusQueueItem{
+		ID:        jobID,
+		Status:    status,
+		Message:   message,
+		Files:     files,
+		UpdatedAt: time.Now(),
 	}
 }
 
-func NewJobStatusMailItem(jobID string, jobType string, userID string, email string, status JobStatus) *MailQueueItem {
-	return &MailQueueItem{
-		UserID:    userID,
-		Job:       &BaseJob{ID: jobID, Type: jobType},
-		To:        email,
-		EmailType: EmailType("job-" + string(status)),
+func NewJobFile(fileType JobFileType, bucket, key, filename, contentType string, size int64, content io.ReadSeeker) *JobFile {
+	id, _ := uuid.NewV7()
+
+	file := JobFile{
+		ID:          id.String(),
+		Type:        fileType,
+		Bucket:      bucket,
+		Key:         key,
+		Filename:    filename,
+		ContentType: contentType,
+		Size:        size,
+		CreatedAt:   time.Now(),
+		Content:     content,
+	}
+
+	return &file
+}
+
+func NewJob(user JobUser, jobType string, files []*JobFile) *Job {
+	id, _ := uuid.NewV7()
+
+	return &Job{
+		ID:        id.String(),
+		User:      user,
+		CreatedAt: time.Now(),
+		Files:     files,
 	}
 }

@@ -58,6 +58,17 @@ func NewS3JobStore(s3Store *S3Store) *S3JobStore {
 	}
 }
 
-func (s *S3JobStore) Upload(ctx context.Context, job *jobs.Job, body io.ReadSeeker) error {
-	return s.s3Store.Upload(ctx, job.Key, body, job.ContentType)
+func (s *S3JobStore) Upload(ctx context.Context, job *jobs.Job) error {
+
+	if len(job.Files) == 0 {
+		return fmt.Errorf("no files associated with job")
+	}
+
+	for _, file := range job.Files {
+		if err := s.s3Store.Upload(ctx, file.Key, file.Content, file.ContentType); err != nil {
+			return fmt.Errorf("upload file %s to S3: %w", file.Key, err)
+		}
+	}
+
+	return nil
 }

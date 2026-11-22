@@ -34,11 +34,18 @@ type (
 	}
 
 	SQSJobConsumer struct {
-		Consumer   *SQSConsumer
-		JobHandler jobs.JobQueue
+		Consumer *SQSConsumer
+	}
+
+	SQSJobStatusConsumer struct {
+		Consumer *SQSConsumer
 	}
 
 	SQSJobQueue struct {
+		Sender *SQSSender
+	}
+
+	SQSJobStatusQueue struct {
 		Sender *SQSSender
 	}
 )
@@ -113,8 +120,8 @@ func NewSQSConsumer(client *sqs.Client,
 
 // Consume starts consuming messages from the SQS queue.
 // This is a long-running function that continuously polls the queue for messages.
-func (c *SQSConsumer) Consume(ctx context.Context, processMessage func(ctx context.Context,
-	message sqstypes.Message) error) {
+func (c *SQSConsumer) Consume(ctx context.Context,
+	processMessage func(ctx context.Context, message sqstypes.Message) error) {
 
 	log.Debug().Msgf("start sqs %s", c.QueueURL)
 
@@ -135,8 +142,25 @@ func (c *SQSConsumer) Consume(ctx context.Context, processMessage func(ctx conte
 		// process each message individually using the worker pool
 		for _, message := range messageBatch.Messages {
 			submitErr := c.pool.Submit(func() {
-				if err := processMessage(ctx, message); err != nil {
+
+				messageID := GetMessageID(message)
+
+				if message.Body == nil || message.ReceiptHandle == nil {
+					log.Error().Msgf("message %s has no body or receipt handle", messageID)
+					return
+				}
+
+				// Seems like have a message so pass off to the message processor
+				err := processMessage(ctx, message)
+
+				if err != nil {
 					log.Error().Msgf("error processing SQS message: %v", err)
+					return
+				}
+
+				// delete the message from the queue if processed successfully
+				if err := c.DeleteMessage(ctx, message); err != nil {
+					log.Error().Msgf("error deleting SQS message: %v", err)
 				}
 			})
 
@@ -162,10 +186,15 @@ func (c *SQSConsumer) Close() {
 	c.pool.Release()
 }
 
-func NewSQSJobConsumer(consumer *SQSConsumer,
+// GetMessageID returns the ID of the SQS message, or "<unknown>" if it is not set.
+func GetMessageID(message sqstypes.Message) string {
+	if message.MessageId != nil {
+		return *message.MessageId
+	}
+	return "<unknown>"
+}
 
-) *SQSJobConsumer {
-
+func NewSQSJobConsumer(consumer *SQSConsumer) *SQSJobConsumer {
 	return &SQSJobConsumer{
 		Consumer: consumer,
 	}
@@ -173,19 +202,11 @@ func NewSQSJobConsumer(consumer *SQSConsumer,
 
 // Consume starts consuming messages from the SQS queue.
 // This is a long-running function that continuously polls the queue for messages.
-func (c *SQSJobConsumer) Consume(ctx context.Context, processJob func(ctx context.Context, job *jobs.Job) error) {
+func (c *SQSJobConsumer) Consume(ctx context.Context,
+	processJob func(ctx context.Context, job *jobs.Job) error) {
 	c.Consumer.Consume(ctx, func(ctx context.Context, message sqstypes.Message) error {
 
-		messageID := "<unknown>"
-
-		if message.MessageId != nil {
-			messageID = *message.MessageId
-		}
-
-		if message.Body == nil || message.ReceiptHandle == nil {
-			return fmt.Errorf("message %s has no body or receipt handle", messageID)
-
-		}
+		messageID := GetMessageID(message)
 
 		var m jobs.Job
 
@@ -197,8 +218,36 @@ func (c *SQSJobConsumer) Consume(ctx context.Context, processJob func(ctx contex
 			return fmt.Errorf("process job %s: %w", messageID, err)
 		}
 
-		if err := c.Consumer.DeleteMessage(ctx, message); err != nil {
-			return fmt.Errorf("delete message %s: %w", messageID, err)
+		// if err := c.Consumer.DeleteMessage(ctx, message); err != nil {
+		// 	return fmt.Errorf("delete message %s: %w", messageID, err)
+		// }
+
+		return nil
+	})
+}
+
+func NewSQSJobStatusConsumer(consumer *SQSConsumer) *SQSJobStatusConsumer {
+	return &SQSJobStatusConsumer{
+		Consumer: consumer,
+	}
+}
+
+// Consume starts consuming messages from the SQS queue.
+// This is a long-running function that continuously polls the queue for messages.
+func (c *SQSJobStatusConsumer) Consume(ctx context.Context,
+	f func(ctx context.Context, job *jobs.JobStatusQueueItem) error) {
+	c.Consumer.Consume(ctx, func(ctx context.Context, message sqstypes.Message) error {
+
+		messageID := GetMessageID(message)
+
+		var m jobs.JobStatusQueueItem
+
+		if err := json.Unmarshal([]byte(*message.Body), &m); err != nil {
+			return fmt.Errorf("decode message %s: %w", messageID, err)
+		}
+
+		if err := f(ctx, &m); err != nil {
+			return fmt.Errorf("process job %s: %w", messageID, err)
 		}
 
 		return nil
@@ -231,6 +280,27 @@ func NewSQSJobQueue(client *sqs.Client, queueUrl string) *SQSJobQueue {
 // Sends a job message to the SQS queue.
 // The message is serialized as JSON and includes message attributes.
 func (queue *SQSJobQueue) SendJob(ctx context.Context, job *jobs.Job) error {
+
+	body, err := json.Marshal(job)
+
+	if err != nil {
+		return err
+	}
+
+	err = queue.Sender.Send(ctx, body)
+
+	return err
+}
+
+func NewSQSJobStatusQueue(client *sqs.Client, queueUrl string) *SQSJobStatusQueue {
+	sender := NewSQSSender(client, queueUrl)
+
+	return &SQSJobStatusQueue{Sender: sender}
+}
+
+// Sends a job message to the SQS queue.
+// The message is serialized as JSON and includes message attributes.
+func (queue *SQSJobStatusQueue) SendJobStatus(ctx context.Context, job *jobs.JobStatusQueueItem) error {
 
 	body, err := json.Marshal(job)
 

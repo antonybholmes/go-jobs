@@ -5,6 +5,7 @@ import (
 	_ "embed"
 	"fmt"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -21,6 +22,42 @@ type (
 	OutboxPublisher interface {
 		PublishOne(context.Context, MessageSender) (bool, error)
 	}
+)
+
+const (
+	CreateJobSql = `INSERT INTO jobs
+		(id, user_id, email, bucket, object_key, filename, content_type, size_bytes, created_at)
+		VALUES (:id, :user_id, :email, :bucket, :object_key, :filename, :content_type, :size_bytes, :created_at)`
+
+	UpdateJobStatusSql = `UPDATE jobs SET status = :status::job_status, updated_at = now() WHERE id = :id`
+
+	InsertJobFilesSql = `INSERT INTO job_files 
+		(id, 
+		type, 
+		bucket, 
+		object_key, 
+		filename, 
+		content_type, 
+		size_bytes, 
+		created_at)
+	VALUES (:id, 
+		:type, 
+		:bucket, 
+		:object_key, 
+		:filename, 
+		:content_type, 
+		:size_bytes, 
+		:created_at)
+	ON CONFLICT (id) DO UPDATE SET 
+		type = :type, 
+		bucket = :bucket, 
+		object_key = :object_key, 
+		filename = :filename, 
+		content_type = :content_type, 
+		size_bytes = :size_bytes, 
+		created_at = :created_at`
+
+	SelectJobUserInfoSql = `SELECT user_id, type, email FROM jobs WHERE id = :id`
 )
 
 //var schema string
@@ -46,23 +83,23 @@ func (s *PostgresStore) CreateJob(ctx context.Context, job *Job) error {
 
 	defer tx.Rollback(context.Background())
 
-	_, err = tx.Exec(ctx, `INSERT INTO jobs
-		(id, user_id, email, bucket, object_key, filename, content_type, size_bytes, created_at)
-		VALUES (:id, :user_id, :email, :bucket, :object_key, :filename, :content_type, :size_bytes, :created_at)`,
+	_, err = tx.Exec(ctx,
+		CreateJobSql,
 		map[string]any{
-			"id":           job.ID,
-			"user_id":      job.User.ID,
-			"email":        job.User.Email,
-			"bucket":       job.Bucket,
-			"object_key":   job.Key,
-			"filename":     job.Filename,
-			"content_type": job.ContentType,
-			"size_bytes":   job.Size,
-			"created_at":   job.CreatedAt,
+			"id":         job.ID,
+			"user_id":    job.User.ID,
+			"email":      job.User.Email,
+			"created_at": job.CreatedAt,
 		})
 
 	if err != nil {
 		return fmt.Errorf("insert job: %w", err)
+	}
+
+	err = insertJobFiles(ctx, tx, job.ID, job.Files)
+
+	if err != nil {
+		return fmt.Errorf("update job file: %w", err)
 	}
 
 	// _, err = tx.Exec(ctx, `INSERT INTO job_outbox (job_id, payload, created_at)
@@ -84,7 +121,7 @@ func (s *PostgresStore) CreateJob(ctx context.Context, job *Job) error {
 	return nil
 }
 
-func (s *PostgresStore) UpdateJobStatus(ctx context.Context, jobID string, status JobStatus) error {
+func (s *PostgresStore) UpdateJobStatus(ctx context.Context, job *JobStatusQueueItem) error {
 
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
@@ -93,22 +130,34 @@ func (s *PostgresStore) UpdateJobStatus(ctx context.Context, jobID string, statu
 
 	defer tx.Rollback(context.Background())
 
-	_, err = tx.Exec(ctx, `UPDATE jobs SET status = :status::job_status, updated_at = now() WHERE id = :id`, map[string]any{
-		"status": status,
-		"id":     jobID,
-	})
+	_, err = tx.Exec(ctx,
+		UpdateJobStatusSql,
+		map[string]any{
+			"id":     job.ID,
+			"status": job.Status,
+		})
 
 	if err != nil {
 		return fmt.Errorf("update job status: %w", err)
+	}
+
+	// update files if any
+
+	err = insertJobFiles(ctx, tx, job.ID, job.Files)
+
+	if err != nil {
+		return fmt.Errorf("update job file: %w", err)
 	}
 
 	var userID string
 	var jobType string
 	var email string
 
-	err = tx.QueryRow(ctx, `SELECT user_id, type, email FROM jobs WHERE id = :id`, map[string]any{
-		"id": jobID,
-	}).Scan(&userID, &jobType, &email)
+	err = tx.QueryRow(ctx,
+		SelectJobUserInfoSql,
+		map[string]any{
+			"id": job.ID,
+		}).Scan(&userID, &jobType, &email)
 
 	if err != nil {
 		return fmt.Errorf("select job user and email: %w", err)
@@ -118,10 +167,35 @@ func (s *PostgresStore) UpdateJobStatus(ctx context.Context, jobID string, statu
 		return fmt.Errorf("commit job transaction: %w", err)
 	}
 
-	mailItem := NewJobStatusMailItem(jobID, jobType, userID, email, status)
+	mailItem := NewJobStatusMailItem(job.ID, jobType, userID, email, job.Status)
 
 	if err := s.emailQueue.SendMail(ctx, mailItem); err != nil {
-		return fmt.Errorf("send email for job %s: %w", jobID, err)
+		return fmt.Errorf("send email for job %s: %w", job.ID, err)
+	}
+
+	return nil
+}
+
+func insertJobFiles(ctx context.Context, tx pgx.Tx, jobID string, files []*JobFile) error {
+	if len(files) > 0 {
+		for _, file := range files {
+			_, err := tx.Exec(ctx,
+				InsertJobFilesSql,
+				map[string]any{
+					"id":           file.ID,
+					"job_id":       jobID,
+					"type":         file.Type,
+					"bucket":       file.Bucket,
+					"object_key":   file.Key,
+					"filename":     file.Filename,
+					"content_type": file.ContentType,
+					"size_bytes":   file.Size,
+				})
+
+			if err != nil {
+				return fmt.Errorf("insert job file: %w", err)
+			}
+		}
 	}
 
 	return nil
