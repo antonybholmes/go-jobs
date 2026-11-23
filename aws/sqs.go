@@ -17,9 +17,9 @@ type (
 		Consumer *awssys.SQSConsumer
 	}
 
-	SQSJobStatusConsumer struct {
-		Consumer *awssys.SQSConsumer
-	}
+	// SQSJobStatusConsumer struct {
+	// 	Consumer *awssys.SQSConsumer
+	// }
 
 	SQSJobQueue struct {
 		Sender *awssys.SQSSender
@@ -30,6 +30,38 @@ type (
 	}
 )
 
+// func NewSQSJobConsumer(consumer *awssys.SQSConsumer) *SQSJobConsumer {
+// 	return &SQSJobConsumer{
+// 		Consumer: consumer,
+// 	}
+// }
+
+// // Consume starts consuming messages from the SQS queue.
+// // This is a long-running function that continuously polls the queue for messages.
+// func (c *SQSJobConsumer) Consume(ctx context.Context,
+// 	processJob func(ctx context.Context, job *jobs.Job) error) {
+// 	c.Consumer.Consume(ctx, func(ctx context.Context, message sqstypes.Message) error {
+
+// 		messageID := awssys.GetMessageID(message)
+
+// 		var m jobs.Job
+
+// 		if err := json.Unmarshal([]byte(*message.Body), &m); err != nil {
+// 			return fmt.Errorf("decode message %s: %w", messageID, err)
+// 		}
+
+// 		if err := processJob(ctx, &m); err != nil {
+// 			return fmt.Errorf("process job %s: %w", messageID, err)
+// 		}
+
+// 		// if err := c.Consumer.DeleteMessage(ctx, message); err != nil {
+// 		// 	return fmt.Errorf("delete message %s: %w", messageID, err)
+// 		// }
+
+// 		return nil
+// 	})
+// }
+
 func NewSQSJobConsumer(consumer *awssys.SQSConsumer) *SQSJobConsumer {
 	return &SQSJobConsumer{
 		Consumer: consumer,
@@ -39,44 +71,12 @@ func NewSQSJobConsumer(consumer *awssys.SQSConsumer) *SQSJobConsumer {
 // Consume starts consuming messages from the SQS queue.
 // This is a long-running function that continuously polls the queue for messages.
 func (c *SQSJobConsumer) Consume(ctx context.Context,
-	processJob func(ctx context.Context, job *jobs.Job) error) {
+	f func(ctx context.Context, job *jobs.JobQueueItem) error) {
 	c.Consumer.Consume(ctx, func(ctx context.Context, message sqstypes.Message) error {
 
 		messageID := awssys.GetMessageID(message)
 
-		var m jobs.Job
-
-		if err := json.Unmarshal([]byte(*message.Body), &m); err != nil {
-			return fmt.Errorf("decode message %s: %w", messageID, err)
-		}
-
-		if err := processJob(ctx, &m); err != nil {
-			return fmt.Errorf("process job %s: %w", messageID, err)
-		}
-
-		// if err := c.Consumer.DeleteMessage(ctx, message); err != nil {
-		// 	return fmt.Errorf("delete message %s: %w", messageID, err)
-		// }
-
-		return nil
-	})
-}
-
-func NewSQSJobStatusConsumer(consumer *awssys.SQSConsumer) *SQSJobStatusConsumer {
-	return &SQSJobStatusConsumer{
-		Consumer: consumer,
-	}
-}
-
-// Consume starts consuming messages from the SQS queue.
-// This is a long-running function that continuously polls the queue for messages.
-func (c *SQSJobStatusConsumer) Consume(ctx context.Context,
-	f func(ctx context.Context, job *jobs.JobStatusQueueItem) error) {
-	c.Consumer.Consume(ctx, func(ctx context.Context, message sqstypes.Message) error {
-
-		messageID := awssys.GetMessageID(message)
-
-		var m jobs.JobStatusQueueItem
+		var m jobs.JobQueueItem
 
 		if err := json.Unmarshal([]byte(*message.Body), &m); err != nil {
 			return fmt.Errorf("decode message %s: %w", messageID, err)
@@ -117,7 +117,9 @@ func NewSQSJobQueue(client *sqs.Client, queueUrl string) *SQSJobQueue {
 // The message is serialized as JSON and includes message attributes.
 func (queue *SQSJobQueue) SendJob(ctx context.Context, job *jobs.Job) error {
 
-	body, err := json.Marshal(job)
+	qi := jobs.JobQueueItem{Job: job, Type: jobs.JobQueueItemTypeSubmit}
+
+	body, err := json.Marshal(qi)
 
 	if err != nil {
 		return err
@@ -136,7 +138,7 @@ func NewSQSJobStatusQueue(client *sqs.Client, queueUrl string) *SQSJobStatusQueu
 
 // Sends a job message to the SQS queue.
 // The message is serialized as JSON and includes message attributes.
-func (queue *SQSJobStatusQueue) SendJobStatus(ctx context.Context, job *jobs.JobStatusQueueItem) error {
+func (queue *SQSJobStatusQueue) SendJobStatus(ctx context.Context, job *jobs.JobQueueItem) error {
 
 	body, err := json.Marshal(job)
 

@@ -3,13 +3,13 @@ package jobs
 import (
 	"context"
 	"io"
-	"time"
 	"uuid"
 )
 
 type (
-	JobStatus   string
-	JobFileType string
+	JobStatus        string
+	JobFileType      string
+	JobQueueItemType string
 
 	JobUser struct {
 		// Unique identifier for the user.
@@ -21,7 +21,7 @@ type (
 	}
 
 	JobFile struct {
-		CreatedAt   time.Time     `json:"createdAt"`
+		//CreatedAt   time.Time     `json:"createdAt"`
 		Content     io.ReadSeeker `json:"-"`
 		ID          string        `json:"id"`
 		Type        JobFileType   `json:"type"`
@@ -34,22 +34,28 @@ type (
 
 	// Job represents a unit of work to be processed.
 	Job struct {
-		User      JobUser   `json:"user"`
-		CreatedAt time.Time `json:"createdAt"`
-		ID        string    `json:"id"`
+		User JobUser `json:"user"`
+		//CreatedAt time.Time `json:"createdAt"`
+		ID string `json:"id"`
 		// Name of the job, if applicable.
-		Name        string     `json:"name,omitempty"`
-		Type        string     `json:"type"`
+		Name string `json:"name,omitempty"`
+		// Type of the job, if applicable, e.g. crispr.
+		Type        string     `json:"type,omitempty"`
 		Description string     `json:"description,omitempty"`
 		Files       []*JobFile `json:"files,omitempty"`
+		//Status      JobStatus  `json:"status,omitempty"`
 	}
 
-	JobStatusQueueItem struct {
-		UpdatedAt time.Time  `json:"updatedAt"`
-		ID        string     `json:"jobId"`
-		Status    JobStatus  `json:"status"`
-		Message   string     `json:"message,omitempty"`
-		Files     []*JobFile `json:"files,omitempty"`
+	JobQueueItem struct {
+		// Why are we sending this item, e.g. submit new job
+		Type JobQueueItemType `json:"type"`
+
+		//UpdatedAt time.Time  `json:"updatedAt"`
+		//ID      string     `json:"jobId"`
+		Status JobStatus `json:"status"`
+		//Message string     `json:"message,omitempty"`
+		//Files   []*JobFile `json:"files,omitempty"`
+		Job *Job `json:"job"`
 	}
 
 	// MailQueue defines the interface for sending mail items to a queue
@@ -82,17 +88,20 @@ const (
 	JobStatusCancelled JobStatus = "cancelled"
 	JobStatusFailed    JobStatus = "failed"
 	JobStatusCompleted JobStatus = "completed"
+
+	JobQueueItemTypeSubmit JobQueueItemType = "submit"
+	JobQueueItemTypeStatus JobQueueItemType = "status"
 )
 
-func NewJobStatusQueueItem(jobID string, status JobStatus, message string, files []*JobFile) *JobStatusQueueItem {
-	return &JobStatusQueueItem{
-		ID:        jobID,
-		Status:    status,
-		Message:   message,
-		Files:     files,
-		UpdatedAt: time.Now(),
-	}
-}
+// func NewJobStatusQueueItem(jobID string, status JobStatus, message string, files []*JobFile) *JobStatusQueueItem {
+// 	return &JobStatusQueueItem{
+// 		ID:      jobID,
+// 		Status:  status,
+// 		Message: message,
+// 		Files:   files,
+// 		//UpdatedAt: time.Now(),
+// 	}
+// }
 
 func NewJobFile(fileType JobFileType, bucket, key, filename, contentType string, size int64, content io.ReadSeeker) *JobFile {
 	id := uuid.NewV7()
@@ -105,8 +114,8 @@ func NewJobFile(fileType JobFileType, bucket, key, filename, contentType string,
 		Filename:    filename,
 		ContentType: contentType,
 		Size:        size,
-		CreatedAt:   time.Now(),
-		Content:     content,
+		//CreatedAt:   time.Now(),
+		Content: content,
 	}
 
 	return &file
@@ -116,9 +125,9 @@ func NewJob(user JobUser, jobType string, files []*JobFile) *Job {
 	id := uuid.NewV7()
 
 	return &Job{
-		ID:        id.String(),
-		User:      user,
-		CreatedAt: time.Now(),
-		Files:     files,
+		ID:   id.String(),
+		User: user,
+		//CreatedAt: time.Now(),
+		Files: files,
 	}
 }

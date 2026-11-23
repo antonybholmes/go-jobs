@@ -2,7 +2,7 @@ package forms
 
 import (
 	"errors"
-	"time"
+
 	"uuid"
 
 	"github.com/antonybholmes/go-jobs"
@@ -66,7 +66,7 @@ func (h *SubmitHandler) SubmitJob(c *gin.Context) error {
 			ID:    userID,
 			Email: user.Email,
 		},
-		CreatedAt: time.Now().UTC(),
+		//CreatedAt: time.Now().UTC(),
 	}
 
 	key := aws.MakeUploadKey(&job, formFile.Filename)
