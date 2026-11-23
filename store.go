@@ -112,7 +112,7 @@ func (s *PostgresStore) CreateJob(ctx context.Context, job *Job) error {
 		return fmt.Errorf("commit job transaction: %w", err)
 	}
 
-	mailItem := NewJobSubmittedMailItem(&job.BaseJob)
+	mailItem := NewJobSubmittedMailItem(job)
 
 	if err := s.emailQueue.SendMail(ctx, mailItem); err != nil {
 		return fmt.Errorf("send email for job %s: %w", job.ID, err)

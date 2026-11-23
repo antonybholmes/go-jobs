@@ -9,7 +9,7 @@ type (
 	// Sent on a queue to an email handler for processing.
 	MailQueueItem struct {
 		Payload *Payload `json:"payload,omitempty"`
-		Job     *BaseJob `json:"job,omitempty"`
+		Job     *Job     `json:"job,omitempty"`
 		// Name of the user, if applicable.
 		UserID    string    `json:"userId,omitempty"`
 		Name      string    `json:"name,omitempty"`
@@ -40,7 +40,7 @@ const (
 	EmailTypeJobCompleted EmailType = "job-completed"
 )
 
-func NewJobSubmittedMailItem(job *BaseJob) *MailQueueItem {
+func NewJobSubmittedMailItem(job *Job) *MailQueueItem {
 	return &MailQueueItem{
 		UserID:    job.User.ID,
 		Job:       job,
@@ -52,7 +52,7 @@ func NewJobSubmittedMailItem(job *BaseJob) *MailQueueItem {
 func NewJobStatusMailItem(jobID string, jobType string, userID string, email string, status JobStatus) *MailQueueItem {
 	return &MailQueueItem{
 		UserID:    userID,
-		Job:       &BaseJob{ID: jobID, Type: jobType},
+		Job:       &Job{ID: jobID, Type: jobType},
 		To:        email,
 		EmailType: EmailType("job-" + string(status)),
 	}

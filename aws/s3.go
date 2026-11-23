@@ -63,7 +63,7 @@ func (s *S3JobStore) DownloadJobFile(ctx context.Context, file *jobs.JobFile) (i
 	return s.s3Store.Download(ctx, file.Key)
 }
 
-func MakeUploadKey(job *jobs.BaseJob, filename string) string {
+func MakeUploadKey(job *jobs.Job, filename string) string {
 	id := uuid.NewV7()
 	//id := sys.NanoId()
 
@@ -76,7 +76,7 @@ func MakeUploadKey(job *jobs.BaseJob, filename string) string {
 
 // MakeS3OutputKey generates the S3 key for storing output files of a job.
 // Files are given a unique identifier with a matching file extension.
-func MakeS3OutputKey(job *jobs.BaseJob, filename string) string {
+func MakeS3OutputKey(job *jobs.Job, filename string) string {
 	id := uuid.NewV7()
 	//id := sys.NanoId()
 
@@ -86,6 +86,6 @@ func MakeS3OutputKey(job *jobs.BaseJob, filename string) string {
 }
 
 // The base key for a user's job in S3 storage. We store all files related to the job under this key.
-func MakeS3JobKey(job *jobs.BaseJob, filename string) string {
+func MakeS3JobKey(job *jobs.Job, filename string) string {
 	return "users/" + job.User.ID + "/jobs/" + job.Type + "/" + job.ID
 }

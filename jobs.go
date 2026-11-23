@@ -20,19 +20,6 @@ type (
 		Name string `json:"name,omitempty"`
 	}
 
-	// Represents a job, but without the specific details of the work to be processed.
-	// This is more for recording job metadata such as sending an email where
-	// details such as an S3 bucket or file key are not necessary.
-	BaseJob struct {
-		User      JobUser   `json:"user"`
-		CreatedAt time.Time `json:"createdAt"`
-		ID        string    `json:"id"`
-		// Name of the job, if applicable.
-		Name        string `json:"name,omitempty"`
-		Type        string `json:"type"`
-		Description string `json:"description,omitempty"`
-	}
-
 	JobFile struct {
 		CreatedAt   time.Time     `json:"createdAt"`
 		Content     io.ReadSeeker `json:"-"`
@@ -47,8 +34,14 @@ type (
 
 	// Job represents a unit of work to be processed.
 	Job struct {
-		BaseJob
-		Files []*JobFile `json:"files,omitempty"`
+		User      JobUser   `json:"user"`
+		CreatedAt time.Time `json:"createdAt"`
+		ID        string    `json:"id"`
+		// Name of the job, if applicable.
+		Name        string     `json:"name,omitempty"`
+		Type        string     `json:"type"`
+		Description string     `json:"description,omitempty"`
+		Files       []*JobFile `json:"files,omitempty"`
 	}
 
 	JobStatusQueueItem struct {
