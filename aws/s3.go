@@ -4,8 +4,10 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"uuid"
 
 	"github.com/antonybholmes/go-jobs"
+	"github.com/antonybholmes/go-sys"
 	awssys "github.com/antonybholmes/go-sys/aws"
 )
 
@@ -19,10 +21,6 @@ func NewS3JobStore(s3Store *awssys.S3Store) *S3JobStore {
 	return &S3JobStore{
 		s3Store: s3Store,
 	}
-}
-
-func (s *S3JobStore) Bucket() string {
-	return s.s3Store.Bucket()
 }
 
 func (s *S3JobStore) Upload(ctx context.Context, job *jobs.Job) error {
@@ -46,13 +44,48 @@ func (s *S3JobStore) UploadJobFile(ctx context.Context, file *jobs.JobFile) erro
 		return fmt.Errorf("no file provided")
 	}
 
-	if err := s.s3Store.Upload(ctx, file.Key, file.Content, file.ContentType); err != nil {
+	if file.Key == "" {
+		return fmt.Errorf("file key is empty")
+	}
+
+	if file.Content == nil {
+		return fmt.Errorf("file content is empty")
+	}
+
+	if err := s.s3Store.Upload(ctx, file.Key, file.ContentType, file.Content); err != nil {
 		return fmt.Errorf("upload file %s to S3: %w", file.Key, err)
 	}
 
 	return nil
 }
 
-func (s *S3JobStore) Download(ctx context.Context, key string) (io.ReadCloser, error) {
-	return s.s3Store.Download(ctx, key)
+func (s *S3JobStore) DownloadJobFile(ctx context.Context, file *jobs.JobFile) (io.ReadCloser, error) {
+	return s.s3Store.Download(ctx, file.Key)
+}
+
+func MakeUploadKey(job *jobs.BaseJob, filename string) string {
+	id := uuid.NewV7()
+	//id := sys.NanoId()
+
+	// Use approved file extension for the uploaded file
+	ext := sys.DetectFileExtension(filename)
+
+	//return "users/" + job.User.ID + "/jobs/" + job.Type + "/" + job.ID + "/uploads/" + filename
+	return MakeS3JobKey(job, filename) + "/uploads/" + id.String() + "." + ext
+}
+
+// MakeS3OutputKey generates the S3 key for storing output files of a job.
+// Files are given a unique identifier with a matching file extension.
+func MakeS3OutputKey(job *jobs.BaseJob, filename string) string {
+	id := uuid.NewV7()
+	//id := sys.NanoId()
+
+	// Use approved file extension for the uploaded file
+	ext := sys.DetectFileExtension(filename)
+	return MakeS3JobKey(job, filename) + "/downloads/" + id.String() + "." + ext
+}
+
+// The base key for a user's job in S3 storage. We store all files related to the job under this key.
+func MakeS3JobKey(job *jobs.BaseJob, filename string) string {
+	return "users/" + job.User.ID + "/jobs/" + job.Type + "/" + job.ID
 }

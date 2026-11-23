@@ -4,8 +4,7 @@ import (
 	"context"
 	"io"
 	"time"
-
-	"github.com/google/uuid"
+	"uuid"
 )
 
 type (
@@ -35,17 +34,15 @@ type (
 	}
 
 	JobFile struct {
-		ID string `json:"id"`
-		// Whether input or output file.
-		Type        JobFileType `json:"type"`
-		Bucket      string      `json:"bucket"`
-		Key         string      `json:"key"`
-		Filename    string      `json:"filename"`
-		ContentType string      `json:"contentType"`
-		Size        int64       `json:"size"`
-		CreatedAt   time.Time   `json:"createdAt"`
-		// The content of the file.
-		Content io.ReadSeeker `json:"-"`
+		CreatedAt   time.Time     `json:"createdAt"`
+		Content     io.ReadSeeker `json:"-"`
+		ID          string        `json:"id"`
+		Type        JobFileType   `json:"type"`
+		Bucket      string        `json:"bucket"`
+		Key         string        `json:"key"`
+		Filename    string        `json:"filename"`
+		ContentType string        `json:"contentType"`
+		Size        int64         `json:"size"`
 	}
 
 	// Job represents a unit of work to be processed.
@@ -55,16 +52,11 @@ type (
 	}
 
 	JobStatusQueueItem struct {
-		// The ID of the job this status update pertains to.
-		ID string `json:"jobId"`
-		// The type of the job.
-		Status JobStatus `json:"status"`
-		// An optional message providing additional context about the job status.
-		Message string `json:"message,omitempty"`
-		// The files created in the s3 bucket as a result of this job.
-		Files []*JobFile `json:"files,omitempty"`
-		// The mode in which the job was executed, if applicable.
-		UpdatedAt time.Time `json:"updatedAt"`
+		UpdatedAt time.Time  `json:"updatedAt"`
+		ID        string     `json:"jobId"`
+		Status    JobStatus  `json:"status"`
+		Message   string     `json:"message,omitempty"`
+		Files     []*JobFile `json:"files,omitempty"`
 	}
 
 	// MailQueue defines the interface for sending mail items to a queue
@@ -110,7 +102,7 @@ func NewJobStatusQueueItem(jobID string, status JobStatus, message string, files
 }
 
 func NewJobFile(fileType JobFileType, bucket, key, filename, contentType string, size int64, content io.ReadSeeker) *JobFile {
-	id, _ := uuid.NewV7()
+	id := uuid.NewV7()
 
 	file := JobFile{
 		ID:          id.String(),
@@ -128,7 +120,7 @@ func NewJobFile(fileType JobFileType, bucket, key, filename, contentType string,
 }
 
 func NewJob(user JobUser, jobType string, files []*JobFile) *Job {
-	id, _ := uuid.NewV7()
+	id := uuid.NewV7()
 
 	return &Job{
 		ID:        id.String(),

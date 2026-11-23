@@ -5,7 +5,8 @@ import (
 	"os"
 	"testing"
 
-	"github.com/google/uuid"
+	"uuid"
+
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -31,7 +32,7 @@ func TestPostgresOutbox(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer admin.Close()
-	schemaName := "test_" + uuid.NewString()[:8]
+	schemaName := "test_" + uuid.NewV7().String()
 	if _, err := admin.Exec(ctx, "CREATE SCHEMA "+schemaName); err != nil {
 		t.Fatal(err)
 	}
