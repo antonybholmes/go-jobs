@@ -22,14 +22,15 @@ type (
 
 	JobFile struct {
 		//CreatedAt   time.Time     `json:"createdAt"`
-		Content     io.ReadSeeker `json:"-"`
-		ID          string        `json:"id"`
-		Type        JobFileType   `json:"type"`
-		Bucket      string        `json:"bucket"`
-		Key         string        `json:"key"`
-		Filename    string        `json:"filename"`
-		ContentType string        `json:"contentType"`
-		Size        int64         `json:"size"`
+		Content io.ReadSeeker `json:"-"`
+		ID      string        `json:"id"`
+		Type    JobFileType   `json:"type"`
+		// For security never expose the actual bucket
+		Bucket      string `json:"-"`
+		Key         string `json:"key"`
+		Filename    string `json:"filename"`
+		ContentType string `json:"contentType"`
+		Size        int64  `json:"size"`
 	}
 
 	// Job represents a unit of work to be processed.
@@ -43,20 +44,20 @@ type (
 		Type        string     `json:"type,omitempty"`
 		Description string     `json:"description,omitempty"`
 		Files       []*JobFile `json:"files,omitempty"`
-		//Status      JobStatus  `json:"status,omitempty"`
+		Status      JobStatus  `json:"status,omitempty"`
 	}
 
-	JobQueueItem struct {
-		// Why are we sending this item, e.g. submit new job
-		Type JobQueueItemType `json:"type"`
+	// JobQueueItem struct {
+	// 	// Why are we sending this item, e.g. submit new job
+	// 	Type JobQueueItemType `json:"type"`
 
-		//UpdatedAt time.Time  `json:"updatedAt"`
-		//ID      string     `json:"jobId"`
-		Status JobStatus `json:"status"`
-		//Message string     `json:"message,omitempty"`
-		//Files   []*JobFile `json:"files,omitempty"`
-		Job *Job `json:"job"`
-	}
+	// 	//UpdatedAt time.Time  `json:"updatedAt"`
+	// 	//ID      string     `json:"jobId"`
+	// 	//Status JobStatus `json:"status"`
+	// 	//Message string     `json:"message,omitempty"`
+	// 	//Files   []*JobFile `json:"files,omitempty"`
+	// 	Job *Job `json:"job"`
+	// }
 
 	// MailQueue defines the interface for sending mail items to a queue
 	JobQueue interface {

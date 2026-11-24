@@ -17,11 +17,11 @@ type (
 	// SubmitHandler handles the submission of jobs, including validating metadata,
 	// uploading files to the object store, and sending jobs to the job queue.
 	SubmitHandler struct {
-		jobType     string
 		jobQueue    jobs.JobQueue
 		objectStore jobs.ObjectStore
-		bucket      string
 		form        *webforms.FormParser
+		jobType     string
+		bucket      string
 	}
 )
 
@@ -47,13 +47,21 @@ func (h *SubmitHandler) SubmitJob(c *gin.Context) error {
 		return err
 	}
 
-	formFile, err := h.form.GetFormFile(c, "file")
+	formFiles, err := h.form.GetFormFiles(c, "file")
 
 	if err != nil {
 		return err
 	}
 
-	defer formFile.File.Close()
+	// Close opened files and remove multipart temporary files.
+	cleanup := func() {
+		for _, formFile := range formFiles {
+			_ = formFile.Close()
+		}
+	}
+
+	// defer cleanup to ensure files are closed on all return paths.
+	defer cleanup()
 
 	id := uuid.NewV7()
 
@@ -66,32 +74,40 @@ func (h *SubmitHandler) SubmitJob(c *gin.Context) error {
 			ID:    userID,
 			Email: user.Email,
 		},
+		Status: jobs.JobStatusSubmitted,
 		//CreatedAt: time.Now().UTC(),
 	}
 
-	key := aws.MakeUploadKey(&job, formFile.Filename)
+	for _, formFile := range formFiles {
+		key := aws.MakeUploadKey(&job, formFile.Filename)
 
-	jobFile := jobs.NewJobFile("input",
-		h.bucket,
-		key,
-		formFile.Filename,
-		formFile.ContentType,
-		formFile.Size,
-		formFile.File,
-	)
+		jobFile := jobs.NewJobFile("input",
+			h.bucket,
+			key,
+			formFile.Filename,
+			formFile.ContentType,
+			formFile.Size,
+			formFile.Content,
+		)
 
-	// add file to job
-	job.Files = append(job.Files, jobFile)
+		// add file to job
+		job.Files = append(job.Files, jobFile)
+	}
 
+	// Store
 	if err := h.objectStore.Upload(c.Request.Context(), &job); err != nil {
 		log.Error().Msgf("upload job file: job_id=%s error=%v", job.ID, err)
 
+		// The upload failed, so remove any partially uploaded objects.
+		cleanup()
 		return errors.New("file upload failed")
+
 	}
 
 	// Send the job to the queue
 	if err := h.jobQueue.SendJob(c.Request.Context(), &job); err != nil {
 		log.Error().Msgf("send job to queue: job_id=%s error=%v", job.ID, err)
+		cleanup()
 		return errors.New("could not send job to queue")
 	}
 

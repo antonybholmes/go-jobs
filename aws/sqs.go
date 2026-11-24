@@ -25,9 +25,9 @@ type (
 		Sender *awssys.SQSSender
 	}
 
-	SQSJobStatusQueue struct {
-		Sender *awssys.SQSSender
-	}
+	// SQSJobStatusQueue struct {
+	// 	Sender *awssys.SQSSender
+	// }
 )
 
 // func NewSQSJobConsumer(consumer *awssys.SQSConsumer) *SQSJobConsumer {
@@ -71,12 +71,12 @@ func NewSQSJobConsumer(consumer *awssys.SQSConsumer) *SQSJobConsumer {
 // Consume starts consuming messages from the SQS queue.
 // This is a long-running function that continuously polls the queue for messages.
 func (c *SQSJobConsumer) Consume(ctx context.Context,
-	f func(ctx context.Context, job *jobs.JobQueueItem) error) {
+	f func(ctx context.Context, job *jobs.Job) error) {
 	c.Consumer.Consume(ctx, func(ctx context.Context, message sqstypes.Message) error {
 
 		messageID := awssys.GetMessageID(message)
 
-		var m jobs.JobQueueItem
+		var m jobs.Job //QueueItem
 
 		if err := json.Unmarshal([]byte(*message.Body), &m); err != nil {
 			return fmt.Errorf("decode message %s: %w", messageID, err)
@@ -117,28 +117,7 @@ func NewSQSJobQueue(client *sqs.Client, queueUrl string) *SQSJobQueue {
 // The message is serialized as JSON and includes message attributes.
 func (queue *SQSJobQueue) SendJob(ctx context.Context, job *jobs.Job) error {
 
-	qi := jobs.JobQueueItem{Job: job, Type: jobs.JobQueueItemTypeSubmit}
-
-	body, err := json.Marshal(qi)
-
-	if err != nil {
-		return err
-	}
-
-	err = queue.Sender.Send(ctx, body)
-
-	return err
-}
-
-func NewSQSJobStatusQueue(client *sqs.Client, queueUrl string) *SQSJobStatusQueue {
-	sender := awssys.NewSQSSender(client, queueUrl)
-
-	return &SQSJobStatusQueue{Sender: sender}
-}
-
-// Sends a job message to the SQS queue.
-// The message is serialized as JSON and includes message attributes.
-func (queue *SQSJobStatusQueue) SendJobStatus(ctx context.Context, job *jobs.JobQueueItem) error {
+	//qi := jobs.JobQueueItem{Job: job, Type: jobs.JobQueueItemTypeSubmit}
 
 	body, err := json.Marshal(job)
 
@@ -150,3 +129,24 @@ func (queue *SQSJobStatusQueue) SendJobStatus(ctx context.Context, job *jobs.Job
 
 	return err
 }
+
+// func NewSQSJobStatusQueue(client *sqs.Client, queueUrl string) *SQSJobStatusQueue {
+// 	sender := awssys.NewSQSSender(client, queueUrl)
+
+// 	return &SQSJobStatusQueue{Sender: sender}
+// }
+
+// // Sends a job message to the SQS queue.
+// // The message is serialized as JSON and includes message attributes.
+// func (queue *SQSJobStatusQueue) SendJobStatus(ctx context.Context, job *jobs.Job) error {
+
+// 	body, err := json.Marshal(job)
+
+// 	if err != nil {
+// 		return err
+// 	}
+
+// 	err = queue.Sender.Send(ctx, body)
+
+// 	return err
+// }

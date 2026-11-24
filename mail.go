@@ -40,20 +40,20 @@ const (
 	EmailTypeJobCompleted EmailType = "job-completed"
 )
 
-func NewJobSubmittedMailItem(job *Job) *MailQueueItem {
+func NewJobMailItem(job *Job) *MailQueueItem {
 	return &MailQueueItem{
 		UserID:    job.User.ID,
 		Job:       job,
 		To:        job.User.Email,
-		EmailType: EmailTypeJobSubmitted,
+		EmailType: EmailType("job-" + string(job.Status)),
 	}
 }
 
-func NewJobStatusMailItem(jobID string, jobType string, userID string, email string, status JobStatus) *MailQueueItem {
-	return &MailQueueItem{
-		UserID:    userID,
-		Job:       &Job{ID: jobID, Type: jobType},
-		To:        email,
-		EmailType: EmailType("job-" + string(status)),
-	}
-}
+// func NewJobStatusMailItem(jobID string, jobType string, userID string, email string, status JobStatus) *MailQueueItem {
+// 	return &MailQueueItem{
+// 		UserID:    userID,
+// 		Job:       &Job{ID: jobID, Type: jobType},
+// 		To:        email,
+// 		EmailType: EmailType("job-" + string(status)),
+// 	}
+// }
