@@ -104,6 +104,8 @@ func (h *SubmitHandler) SubmitJob(c *gin.Context) error {
 
 	}
 
+	log.Debug().Msgf("sending job of type %s", job.Type)
+
 	// Send the job to the queue
 	if err := h.jobQueue.SendJob(c.Request.Context(), &job); err != nil {
 		log.Error().Msgf("send job to queue: job_id=%s error=%v", job.ID, err)

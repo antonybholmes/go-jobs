@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"path/filepath"
+	"strings"
 	"uuid"
 
 	"github.com/antonybholmes/go-jobs"
@@ -79,9 +80,11 @@ func (s *S3JobStore) DownloadJobFile(ctx context.Context, file *jobs.JobFile) (i
 	return s.s3Store.Download(ctx, file.Key)
 }
 
-func (s *S3JobStore) DownloadJobFileLocal(ctx context.Context, file *jobs.JobFile, dir string) (string, error) {
+func (s *S3JobStore) DownloadJobFileLocal(ctx context.Context, file *jobs.JobFile, path string) (string, error) {
 
-	path := filepath.Join(dir, filepath.Base(file.Key))
+	if strings.HasSuffix(path, "/") {
+		path = filepath.Join(path, filepath.Base(file.Key))
+	}
 
 	if _, err := s.s3Store.DownloadLocal(ctx, file.Key, path); err != nil {
 		return "", fmt.Errorf("download file %s from S3: %w", file.Key, err)
@@ -110,6 +113,11 @@ func MakeS3JobFileOutputKey(job *jobs.Job, filename string) string {
 	// Use approved file extension for the uploaded file
 	ext := sys.DetectFileExtension(filename)
 	return MakeS3JobKey(job, filename) + "/downloads/" + id.String() + "." + ext
+}
+
+// MakeS3JobFileExactOutputKey generates the S3 key for storing an output file of a job using the files name
+func MakeS3JobFileExactOutputKey(job *jobs.Job, filename string) string {
+	return MakeS3JobKey(job, filename) + "/downloads/" + filepath.Base(filename)
 }
 
 // The base key for a user's job in S3 storage. We store all files related to the job under this key.

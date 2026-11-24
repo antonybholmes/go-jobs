@@ -152,25 +152,34 @@ func (s *PostgresStore) InsertJob(ctx context.Context, job *Job) error {
 
 	log.Debug().Msgf("Inserting job:  %s", InsertJobSql)
 
-	typeID, ok := JobTypeMap[job.Type]
-	if !ok {
-		return fmt.Errorf("unknown job type: %s", job.Type)
+	args := pgx.NamedArgs{
+		"id": job.ID,
+
+		"status_id": JobStatusMap[job.Status],
+		//"created_at": q.Job.CreatedAt,
 	}
 
-	args := pgx.NamedArgs{
-		"id":        job.ID,
-		"user_id":   job.User.ID,
-		"email":     job.User.Email,
-		"type_id":   typeID,
-		"status_id": JobStatusSubmittedID,
-		//"created_at": q.Job.CreatedAt,
+	var sql string
+
+	if job.Status == JobStatusSubmitted {
+		typeID, ok := JobTypeMap[job.Type]
+		if !ok {
+			return fmt.Errorf("unknown job type: %s", job.Type)
+		}
+
+		sql = InsertJobSql
+		args["user_id"] = job.User.ID
+		args["email"] = job.User.Email
+		args["type_id"] = typeID
+	} else {
+		sql = UpdateJobStatusSql
 	}
 
 	log.Debug().Msgf("Inserting job with args: %v", args)
 
 	// For idempotency, job will fail insert if we try to insert a duplicate job ID.
 	_, err = tx.Exec(ctx,
-		InsertJobSql,
+		sql,
 		args)
 
 	if err != nil {

@@ -8,6 +8,7 @@ import (
 	"github.com/antonybholmes/go-jobs"
 
 	awssys "github.com/antonybholmes/go-sys/aws"
+	"github.com/antonybholmes/go-sys/log"
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
 	sqstypes "github.com/aws/aws-sdk-go-v2/service/sqs/types"
 )
@@ -118,6 +119,8 @@ func NewSQSJobQueue(client *sqs.Client, queueUrl string) *SQSJobQueue {
 func (queue *SQSJobQueue) SendJob(ctx context.Context, job *jobs.Job) error {
 
 	//qi := jobs.JobQueueItem{Job: job, Type: jobs.JobQueueItemTypeSubmit}
+
+	log.Debug().Msgf("sending job %s of type %s", job.ID, job.Status)
 
 	body, err := json.Marshal(job)
 
