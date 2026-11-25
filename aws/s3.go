@@ -33,7 +33,7 @@ func (s *S3JobStore) Upload(ctx context.Context, job *jobs.Job) error {
 
 	for _, file := range job.Files {
 		if err := s.UploadJobFile(ctx, file); err != nil {
-			return fmt.Errorf("upload file %s to S3: %w", file.Key, err)
+			return fmt.Errorf("upload file %s to S3: %w", file.ObjectKey, err)
 		}
 	}
 
@@ -48,7 +48,7 @@ func (s *S3JobStore) UploadFiles(ctx context.Context, files []*jobs.JobFile) err
 
 	for _, file := range files {
 		if err := s.UploadJobFile(ctx, file); err != nil {
-			return fmt.Errorf("upload file %s to S3: %w", file.Key, err)
+			return fmt.Errorf("upload file %s to S3: %w", file.ObjectKey, err)
 		}
 	}
 
@@ -61,7 +61,7 @@ func (s *S3JobStore) UploadJobFile(ctx context.Context, file *jobs.JobFile) erro
 		return fmt.Errorf("no file provided")
 	}
 
-	if file.Key == "" {
+	if file.ObjectKey == "" {
 		return fmt.Errorf("file key is empty")
 	}
 
@@ -69,25 +69,25 @@ func (s *S3JobStore) UploadJobFile(ctx context.Context, file *jobs.JobFile) erro
 		return fmt.Errorf("file content is empty")
 	}
 
-	if err := s.s3Store.Upload(ctx, file.Content, file.Key, file.ContentType); err != nil {
-		return fmt.Errorf("upload file %s to S3: %w", file.Key, err)
+	if err := s.s3Store.Upload(ctx, file.Content, file.ObjectKey, file.ContentType); err != nil {
+		return fmt.Errorf("upload file %s to S3: %w", file.ObjectKey, err)
 	}
 
 	return nil
 }
 
 func (s *S3JobStore) DownloadJobFile(ctx context.Context, file *jobs.JobFile) (io.ReadCloser, error) {
-	return s.s3Store.Download(ctx, file.Key)
+	return s.s3Store.Download(ctx, file.ObjectKey)
 }
 
 func (s *S3JobStore) DownloadJobFileLocal(ctx context.Context, file *jobs.JobFile, path string) (string, error) {
 
 	if strings.HasSuffix(path, "/") {
-		path = filepath.Join(path, filepath.Base(file.Key))
+		path = filepath.Join(path, filepath.Base(file.ObjectKey))
 	}
 
-	if _, err := s.s3Store.DownloadLocal(ctx, file.Key, path); err != nil {
-		return "", fmt.Errorf("download file %s from S3: %w", file.Key, err)
+	if _, err := s.s3Store.DownloadLocal(ctx, file.ObjectKey, path); err != nil {
+		return "", fmt.Errorf("download file %s from S3: %w", file.ObjectKey, err)
 	}
 
 	return path, nil

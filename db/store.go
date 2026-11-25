@@ -286,7 +286,7 @@ func insertJobFiles(ctx context.Context, tx pgx.Tx, jobID string, files []*jobs.
 					"job_id":       jobID,
 					"file_type_id": fileTypeID,
 					"bucket":       file.Bucket,
-					"object_key":   file.Key,
+					"object_key":   file.ObjectKey,
 					"filename":     file.Filename,
 					"content_type": file.ContentType,
 					"size_bytes":   file.Size,

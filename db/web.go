@@ -28,29 +28,37 @@ const (
 	PageSize = 100
 
 	ListJobsSql = `SELECT 
-		id, 
-		user_id, 
-		email, 
-		type_types.name as type, 
-		status_types.name as status
-		FROM jobs
-		JOIN status_types ON jobs.status_id = status_types.id
-		JOIN type_types ON jobs.type_id = type_types.id
-		WHERE user_id = @user_id::uuid
+		j.id, 
+		j.user_id, 
+		j.email, 
+		jt.name as type, 
+		js.name as status,
+		j.created_at,
+		j.updated_at
+		FROM jobs j
+		JOIN job_statuses js ON j.status_id = js.id
+		JOIN job_types jt ON j.type_id = jt.id
+		WHERE j.user_id = @user_id::uuid
+		ORDER BY 
+			jt.name DESC,
+			js.name DESC,
+			j.created_at DESC
 		LIMIT @limit OFFSET @offset`
 
 	ListJobFilesSql = `SELECT
-		jf.id,	
-		jf.job_id,
+		f.id,	
+		f.job_id,
 		ft.name as type,
-		jf.bucket,
-		jf.key,
-		jf.filename,
-		jf.content_type,
-		jf.size
-		FROM job_files AS jf
-		JOIN file_types AS ft ON jf.type_id = ft.id
-		WHERE jf.job_id = ANY(@ids::uuid[])`
+		f.bucket,
+		f.object_key,
+		f.filename,
+		f.content_type,
+		f.size_bytes,
+		f.created_at,
+		f.updated_at
+		FROM files AS f
+		JOIN file_types AS ft ON f.file_type_id = ft.id
+		WHERE f.job_id = ANY(@ids::uuid[])`
 
 	CountJobsSql = `SELECT COUNT(id) FROM jobs WHERE user_id = @user_id::uuid`
 )
@@ -113,7 +121,13 @@ func (s *PostgresWebStore) ListJobs(ctx context.Context, userID string, page int
 
 	for rows.Next() {
 		var job jobs.Job
-		if err := rows.Scan(&job.ID, &job.User.ID, &job.User.Email, &job.Type, &job.Status); err != nil {
+		if err := rows.Scan(&job.ID,
+			&job.User.ID,
+			&job.User.Email,
+			&job.Type,
+			&job.Status,
+			&job.CreatedAt,
+			&job.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("scan job: %w", err)
 		}
 		jobList = append(jobList, &job)
@@ -151,10 +165,12 @@ func (s *PostgresWebStore) ListJobs(ctx context.Context, userID string, page int
 				&jobID,
 				&file.Type,
 				&file.Bucket,
-				&file.Key,
+				&file.ObjectKey,
 				&file.Filename,
 				&file.ContentType,
-				&file.Size); err != nil {
+				&file.Size,
+				&file.CreatedAt,
+				&file.UpdatedAt); err != nil {
 				return nil, fmt.Errorf("scan job file: %w", err)
 			}
 

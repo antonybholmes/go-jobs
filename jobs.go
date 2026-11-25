@@ -3,6 +3,7 @@ package jobs
 import (
 	"context"
 	"io"
+	"time"
 	"uuid"
 )
 
@@ -26,11 +27,13 @@ type (
 		ID      string        `json:"id"`
 		Type    JobFileType   `json:"type"`
 		// For security never expose the actual bucket
-		Bucket      string `json:"-"`
-		Key         string `json:"key"`
-		Filename    string `json:"filename"`
-		ContentType string `json:"contentType"`
-		Size        int64  `json:"size"`
+		Bucket      string    `json:"-"`
+		ObjectKey   string    `json:"objectKey"`
+		Filename    string    `json:"filename"`
+		ContentType string    `json:"contentType"`
+		Size        int64     `json:"size"`
+		CreatedAt   time.Time `json:"createdAt"`
+		UpdatedAt   time.Time `json:"updatedAt"`
 	}
 
 	// Job represents a unit of work to be processed.
@@ -41,6 +44,8 @@ type (
 		Type        string     `json:"type,omitempty"`
 		Description string     `json:"description,omitempty"`
 		Status      JobStatus  `json:"status,omitempty"`
+		CreatedAt   time.Time  `json:"createdAt"`
+		UpdatedAt   time.Time  `json:"updatedAt"`
 		Files       []*JobFile `json:"files,omitempty"`
 	}
 
@@ -108,7 +113,7 @@ func NewJobFile(fileType JobFileType, bucket, key, filename, contentType string,
 		ID:          id.String(),
 		Type:        fileType,
 		Bucket:      bucket,
-		Key:         key,
+		ObjectKey:   key,
 		Filename:    filename,
 		ContentType: contentType,
 		Size:        size,
