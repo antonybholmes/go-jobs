@@ -209,6 +209,9 @@ func (s *PostgresStore) InsertJob(ctx context.Context, job *jobs.Job) error {
 
 	mailItem := jobs.NewJobMailItem(job)
 
+	log.Debug().Msgf("Sending job email xx: %v %v %v %v %v %v", mailItem.EmailType, job.Type, job.Status,
+		job.User, mailItem.From, mailItem.To)
+
 	if err := s.emailQueue.SendMail(ctx, mailItem); err != nil {
 		return fmt.Errorf("send email for job %s: %w", job.ID, err)
 	}

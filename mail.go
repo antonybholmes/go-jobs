@@ -31,7 +31,7 @@ type (
 )
 
 const (
-	EmailTypeJobSubmitted EmailType = "job-submitted"
+	EmailTypeJob          EmailType = "job"
 	EmailTypeJobQueued    EmailType = "job-queued"
 	EmailTypeJobStarted   EmailType = "job-started"
 	EmailTypeJobError     EmailType = "job-error"
@@ -45,7 +45,7 @@ func NewJobMailItem(job *Job) *MailQueueItem {
 		UserID:    job.User.ID,
 		Job:       job,
 		To:        job.User.Email,
-		EmailType: EmailType("job-" + string(job.Status)),
+		EmailType: EmailTypeJob,
 	}
 }
 
