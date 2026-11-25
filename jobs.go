@@ -35,16 +35,13 @@ type (
 
 	// Job represents a unit of work to be processed.
 	Job struct {
-		User JobUser `json:"user"`
-		//CreatedAt time.Time `json:"createdAt"`
-		ID string `json:"id"`
-		// Name of the job, if applicable.
-		Name string `json:"name,omitempty"`
-		// Type of the job, if applicable, e.g. crispr.
+		User        JobUser    `json:"user"`
+		ID          string     `json:"id"`
+		Name        string     `json:"name,omitempty"`
 		Type        string     `json:"type,omitempty"`
 		Description string     `json:"description,omitempty"`
-		Files       []*JobFile `json:"files,omitempty"`
 		Status      JobStatus  `json:"status,omitempty"`
+		Files       []*JobFile `json:"files,omitempty"`
 	}
 
 	// JobQueueItem struct {

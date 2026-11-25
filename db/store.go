@@ -1,10 +1,11 @@
-package jobs
+package db
 
 import (
 	"context"
 	_ "embed"
 	"fmt"
 
+	"github.com/antonybholmes/go-jobs"
 	"github.com/antonybholmes/go-sys/log"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -12,7 +13,7 @@ import (
 
 type (
 	PostgresStore struct {
-		emailQueue MailQueue
+		emailQueue jobs.MailQueue
 		pool       *pgxpool.Pool
 	}
 
@@ -67,7 +68,7 @@ const (
 )
 
 var (
-	JobStatusMap = map[JobStatus]int{
+	JobStatusMap = map[jobs.JobStatus]int{
 		"submitted": JobStatusSubmittedID,
 		"pending":   JobStatusPendingID,
 		"running":   JobStatusRunningID,
@@ -80,13 +81,13 @@ var (
 		string(JobTypeCrispr): 2,
 	}
 
-	FileTypeMap = map[JobFileType]int{
-		JobFileTypeInput:  FileTypeInputID,
-		JobFileTypeOutput: FileTypeOutputID,
+	FileTypeMap = map[jobs.JobFileType]int{
+		jobs.JobFileTypeInput:  FileTypeInputID,
+		jobs.JobFileTypeOutput: FileTypeOutputID,
 	}
 )
 
-func NewPostgresStore(pool *pgxpool.Pool, emailQueue MailQueue) *PostgresStore {
+func NewPostgresStore(pool *pgxpool.Pool, emailQueue jobs.MailQueue) *PostgresStore {
 	return &PostgresStore{
 		pool:       pool,
 		emailQueue: emailQueue,
@@ -141,7 +142,7 @@ func NewPostgresStore(pool *pgxpool.Pool, emailQueue MailQueue) *PostgresStore {
 // 	return nil
 // }
 
-func (s *PostgresStore) InsertJob(ctx context.Context, job *Job) error {
+func (s *PostgresStore) InsertJob(ctx context.Context, job *jobs.Job) error {
 
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
@@ -161,7 +162,7 @@ func (s *PostgresStore) InsertJob(ctx context.Context, job *Job) error {
 
 	var sql string
 
-	if job.Status == JobStatusSubmitted {
+	if job.Status == jobs.JobStatusSubmitted {
 		typeID, ok := JobTypeMap[job.Type]
 		if !ok {
 			return fmt.Errorf("unknown job type: %s", job.Type)
@@ -206,7 +207,7 @@ func (s *PostgresStore) InsertJob(ctx context.Context, job *Job) error {
 		return fmt.Errorf("commit job transaction: %w", err)
 	}
 
-	mailItem := NewJobMailItem(job)
+	mailItem := jobs.NewJobMailItem(job)
 
 	if err := s.emailQueue.SendMail(ctx, mailItem); err != nil {
 		return fmt.Errorf("send email for job %s: %w", job.ID, err)
@@ -267,7 +268,7 @@ func (s *PostgresStore) InsertJob(ctx context.Context, job *Job) error {
 // 	return nil
 // }
 
-func insertJobFiles(ctx context.Context, tx pgx.Tx, jobID string, files []*JobFile) error {
+func insertJobFiles(ctx context.Context, tx pgx.Tx, jobID string, files []*jobs.JobFile) error {
 	if len(files) > 0 {
 		for _, file := range files {
 

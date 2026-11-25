@@ -1,10 +1,12 @@
-package jobs
+package db
 
 import (
 	"context"
 	"fmt"
 
+	"github.com/antonybholmes/go-jobs"
 	sysdb "github.com/antonybholmes/go-sys/db"
+	"github.com/antonybholmes/go-sys/log"
 	basemath "github.com/antonybholmes/go-sys/math"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -12,8 +14,13 @@ import (
 
 type (
 	PostgresWebStore struct {
-		emailQueue MailQueue
+		emailQueue jobs.MailQueue
 		pool       *pgxpool.Pool
+	}
+
+	JobWebStore interface {
+		CountJobs(ctx context.Context, userID string, pageSize int) (*sysdb.RecordStats, error)
+		ListJobs(ctx context.Context, userID string, page int, pageSize int) ([]*jobs.Job, error)
 	}
 )
 
@@ -50,7 +57,13 @@ const (
 
 // Store for the web compoments to list jobs etc.
 // This is designed for read only access
-func NewPostgresWebStore(pool *pgxpool.Pool) *PostgresWebStore {
+func NewPostgresWebStore(ctx context.Context, databaseURL string) *PostgresWebStore {
+	pool, err := pgxpool.New(ctx, databaseURL)
+
+	if err != nil {
+		log.Fatal().Msgf("configure PostgreSQL: %v", err)
+	}
+
 	return &PostgresWebStore{
 		pool: pool,
 	}
@@ -79,7 +92,7 @@ func (s *PostgresWebStore) CountJobs(ctx context.Context, userID string, pageSiz
 
 // List all jobs for a given user.
 // Page size will be clamped to the range [1, PageSize].
-func (s *PostgresWebStore) ListJobs(ctx context.Context, userID string, page int, pageSize int) ([]*Job, error) {
+func (s *PostgresWebStore) ListJobs(ctx context.Context, userID string, page int, pageSize int) ([]*jobs.Job, error) {
 	// user cannot request more than PageSize jobs per page.
 	pageSize = basemath.Clamp(pageSize, 1, PageSize)
 
@@ -96,14 +109,14 @@ func (s *PostgresWebStore) ListJobs(ctx context.Context, userID string, page int
 	}
 	defer rows.Close()
 
-	jobs := make([]*Job, 0)
+	jobList := make([]*jobs.Job, 0)
 
 	for rows.Next() {
-		var job Job
+		var job jobs.Job
 		if err := rows.Scan(&job.ID, &job.User.ID, &job.User.Email, &job.Type, &job.Status); err != nil {
 			return nil, fmt.Errorf("scan job: %w", err)
 		}
-		jobs = append(jobs, &job)
+		jobList = append(jobList, &job)
 	}
 
 	if err := rows.Err(); err != nil {
@@ -112,10 +125,10 @@ func (s *PostgresWebStore) ListJobs(ctx context.Context, userID string, page int
 
 	// get all files for all jobs and allocate to each job
 
-	ids := make([]string, 0, len(jobs))
-	jobMap := make(map[string]*Job, len(jobs))
+	ids := make([]string, 0, len(jobList))
+	jobMap := make(map[string]*jobs.Job, len(jobList))
 
-	for _, job := range jobs {
+	for _, job := range jobList {
 		ids = append(ids, job.ID)
 		jobMap[job.ID] = job
 	}
@@ -133,7 +146,7 @@ func (s *PostgresWebStore) ListJobs(ctx context.Context, userID string, page int
 
 		for fileRows.Next() {
 			var jobID string
-			var file JobFile
+			var file jobs.JobFile
 			if err := fileRows.Scan(&file.ID,
 				&jobID,
 				&file.Type,
@@ -153,5 +166,5 @@ func (s *PostgresWebStore) ListJobs(ctx context.Context, userID string, page int
 		}
 	}
 
-	return jobs, nil
+	return jobList, nil
 }
