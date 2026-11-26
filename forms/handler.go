@@ -20,12 +20,12 @@ type (
 		jobQueue    jobs.JobQueue
 		objectStore jobs.ObjectStore
 		form        *webforms.FormParser
-		jobType     string
+		jobType     jobs.JobType
 		bucket      string
 	}
 )
 
-func NewSubmitJobHandler(jobType string,
+func NewSubmitJobHandler(jobType jobs.JobType,
 	jobQueue jobs.JobQueue,
 	objectStore jobs.ObjectStore,
 	bucket string,
@@ -81,8 +81,7 @@ func (h *SubmitHandler) SubmitJob(c *gin.Context) error {
 	for _, formFile := range formFiles {
 		key := aws.MakeUploadKey(&job, formFile.Filename)
 
-		jobFile := jobs.NewJobFile("input",
-			h.bucket,
+		jobFile := jobs.NewJobFile(jobs.JobFileTypeInput,
 			key,
 			formFile.Filename,
 			formFile.ContentType,

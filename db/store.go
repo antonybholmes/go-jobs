@@ -12,20 +12,20 @@ import (
 )
 
 type (
+	TypeID int
+
 	PostgresStore struct {
 		emailQueue jobs.MailQueue
 		pool       *pgxpool.Pool
 	}
 
-	MessageSender interface {
-		Send(ctx context.Context, payload []byte) error
-	}
+	// MessageSender interface {
+	// 	Send(ctx context.Context, payload []byte) error
+	// }
 
-	OutboxPublisher interface {
-		PublishOne(context.Context, MessageSender) (bool, error)
-	}
-
-	JobType string
+	// OutboxPublisher interface {
+	// 	PublishOne(context.Context, MessageSender) (bool, error)
+	// }
 )
 
 const (
@@ -41,6 +41,7 @@ const (
 
 	UpdateJobStatusSql = `UPDATE jobs SET status_id = @status_id WHERE id = @id::uuid`
 
+	// Inserting job files associated with a job. If they exist, do nothing
 	InsertJobFilesSql = `INSERT INTO files 
 		(id, job_id, file_type_id, bucket, object_key, filename, content_type, size_bytes)
 		VALUES 
@@ -54,21 +55,20 @@ const (
 		FROM jobs JOIN job_types ON jobs.type_id = job_types.id 
 		WHERE jobs.id = @id::uuid`
 
-	JobTypeTest   JobType = "test"
-	JobTypeCrispr JobType = "crispr"
+	// Special, known job status IDs for the system
+	JobStatusSubmittedID TypeID = 1
+	JobStatusPendingID   TypeID = 2
+	JobStatusRunningID   TypeID = 3
+	JobStatusCompletedID TypeID = 4
+	JobStatusFailedID    TypeID = 5
 
-	JobStatusSubmittedID int = 1
-	JobStatusPendingID   int = 2
-	JobStatusRunningID   int = 3
-	JobStatusCompletedID int = 4
-	JobStatusFailedID    int = 5
-
-	FileTypeInputID  int = 1
-	FileTypeOutputID int = 2
+	// Known file type IDs for the system
+	FileTypeInputID  TypeID = 1
+	FileTypeOutputID TypeID = 2
 )
 
 var (
-	JobStatusMap = map[jobs.JobStatus]int{
+	JobStatusMap = map[jobs.JobStatus]TypeID{
 		"submitted": JobStatusSubmittedID,
 		"pending":   JobStatusPendingID,
 		"running":   JobStatusRunningID,
@@ -76,12 +76,12 @@ var (
 		"failed":    JobStatusFailedID,
 	}
 
-	JobTypeMap = map[string]int{
-		string(JobTypeTest):   1,
-		string(JobTypeCrispr): 2,
+	JobTypeMap = map[jobs.JobType]TypeID{
+		jobs.JobTypeTest:   1,
+		jobs.JobTypeCrispr: 2,
 	}
 
-	FileTypeMap = map[jobs.JobFileType]int{
+	FileTypeMap = map[jobs.JobFileType]TypeID{
 		jobs.JobFileTypeInput:  FileTypeInputID,
 		jobs.JobFileTypeOutput: FileTypeOutputID,
 	}
@@ -154,8 +154,7 @@ func (s *PostgresStore) InsertJob(ctx context.Context, job *jobs.Job) error {
 	log.Debug().Msgf("Inserting job:  %s", InsertJobSql)
 
 	args := pgx.NamedArgs{
-		"id": job.ID,
-
+		"id":        job.ID,
 		"status_id": JobStatusMap[job.Status],
 		//"created_at": q.Job.CreatedAt,
 	}
@@ -169,10 +168,13 @@ func (s *PostgresStore) InsertJob(ctx context.Context, job *jobs.Job) error {
 		}
 
 		sql = InsertJobSql
+
+		// Insertions need extra fields for new jobs
 		args["user_id"] = job.User.ID
 		args["email"] = job.User.Email
 		args["type_id"] = typeID
 	} else {
+		// We need only basic job info
 		sql = UpdateJobStatusSql
 	}
 
@@ -190,6 +192,7 @@ func (s *PostgresStore) InsertJob(ctx context.Context, job *jobs.Job) error {
 
 	log.Debug().Msg("Inserting job files")
 
+	// Insert job files associated with the job
 	err = insertJobFiles(ctx, tx, job.ID, job.Files)
 
 	if err != nil {
@@ -288,7 +291,7 @@ func insertJobFiles(ctx context.Context, tx pgx.Tx, jobID string, files []*jobs.
 					"id":           file.ID,
 					"job_id":       jobID,
 					"file_type_id": fileTypeID,
-					"bucket":       file.Bucket,
+					//"bucket":       file.Bucket,
 					"object_key":   file.ObjectKey,
 					"filename":     file.Filename,
 					"content_type": file.ContentType,

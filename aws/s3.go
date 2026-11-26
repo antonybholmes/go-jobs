@@ -100,7 +100,6 @@ func MakeUploadKey(job *jobs.Job, filename string) string {
 	// Use approved file extension for the uploaded file
 	ext := sys.DetectFileExtension(filename)
 
-	//return "users/" + job.User.ID + "/jobs/" + job.Type + "/" + job.ID + "/uploads/" + filename
 	return MakeS3JobKey(job, filename) + "/uploads/" + id.String() + "." + ext
 }
 
@@ -122,5 +121,5 @@ func MakeS3JobFileExactOutputKey(job *jobs.Job, filename string) string {
 
 // The base key for a user's job in S3 storage. We store all files related to the job under this key.
 func MakeS3JobKey(job *jobs.Job, filename string) string {
-	return "users/" + job.User.ID + "/jobs/" + job.Type + "/" + job.ID
+	return "users/" + job.User.ID + "/jobs/" + string(job.Type) + "/" + job.ID
 }

@@ -5,8 +5,14 @@ import (
 )
 
 type (
-
-	// Sent on a queue to an email handler for processing.
+	// Item send on the mail queue to generate emails.
+	// It is defined in jobs because one of its functions
+	// is handling jobs, but it is a general-purpose mail queue
+	// for all email types the system can send. The actual
+	// sending logic is implemented in the go-mail package.
+	// This was the only way to fix a circular dependency
+	// where mail needs to reference jobs,
+	// and jobs needs to reference mail.
 	MailQueueItem struct {
 		Payload *Payload `json:"payload,omitempty"`
 		Job     *Job     `json:"job,omitempty"`
@@ -48,12 +54,3 @@ func NewJobMailItem(job *Job) *MailQueueItem {
 		EmailType: EmailTypeJob,
 	}
 }
-
-// func NewJobStatusMailItem(jobID string, jobType string, userID string, email string, status JobStatus) *MailQueueItem {
-// 	return &MailQueueItem{
-// 		UserID:    userID,
-// 		Job:       &Job{ID: jobID, Type: jobType},
-// 		To:        email,
-// 		EmailType: EmailType("job-" + string(status)),
-// 	}
-// }

@@ -6,6 +6,7 @@ import (
 )
 
 type (
+	// CloudFrontJobStore provides signed URLs for job files stored in CloudFront.
 	CloudFrontJobStore struct {
 		cloudfrontStore *awssys.CloudFrontStore
 	}

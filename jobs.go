@@ -8,6 +8,7 @@ import (
 )
 
 type (
+	JobType          string
 	JobStatus        string
 	JobFileType      string
 	JobQueueItemType string
@@ -22,44 +23,34 @@ type (
 	}
 
 	JobFile struct {
-		//CreatedAt   time.Time     `json:"createdAt"`
-		Content io.ReadSeeker `json:"-"`
-		ID      string        `json:"id"`
-		Type    JobFileType   `json:"type"`
-		// For security never expose the actual bucket
-		Bucket      string    `json:"-"`
-		ObjectKey   string    `json:"objectKey"`
-		Filename    string    `json:"filename"`
-		ContentType string    `json:"contentType"`
-		Size        int64     `json:"size"`
-		CreatedAt   time.Time `json:"createdAt"`
-		UpdatedAt   time.Time `json:"updatedAt"`
+		CreatedAt time.Time     `json:"createdAt"`
+		UpdatedAt time.Time     `json:"updatedAt"`
+		Content   io.ReadSeeker `json:"-"`
+		ID        string        `json:"id"`
+		Type      JobFileType   `json:"type"`
+		//Bucket      string     `json:"-"`
+		ObjectKey   string `json:"objectKey"`
+		Filename    string `json:"filename"`
+		ContentType string `json:"contentType"`
+		Size        int64  `json:"size"`
 	}
 
 	// Job represents a unit of work to be processed.
 	Job struct {
-		User        JobUser    `json:"user"`
-		ID          string     `json:"id"`
-		Name        string     `json:"name,omitempty"`
-		Type        string     `json:"type,omitempty"`
-		Description string     `json:"description,omitempty"`
-		Status      JobStatus  `json:"status,omitempty"`
-		CreatedAt   time.Time  `json:"createdAt"`
-		UpdatedAt   time.Time  `json:"updatedAt"`
-		Files       []*JobFile `json:"files,omitempty"`
+		User        JobUser `json:"user"`
+		ID          string  `json:"id"`
+		Name        string  `json:"name,omitempty"`
+		Type        JobType `json:"type,omitempty"`
+		Description string  `json:"description,omitempty"`
+		// The S3 bucket where job files are stored.
+		// This is not exposed in the JSON representation since users
+		// do not need to see the underlying storage details.
+		Bucket    string     `json:"-"`
+		Status    JobStatus  `json:"status,omitempty"`
+		CreatedAt time.Time  `json:"createdAt"`
+		UpdatedAt time.Time  `json:"updatedAt"`
+		Files     []*JobFile `json:"files,omitempty"`
 	}
-
-	// JobQueueItem struct {
-	// 	// Why are we sending this item, e.g. submit new job
-	// 	Type JobQueueItemType `json:"type"`
-
-	// 	//UpdatedAt time.Time  `json:"updatedAt"`
-	// 	//ID      string     `json:"jobId"`
-	// 	//Status JobStatus `json:"status"`
-	// 	//Message string     `json:"message,omitempty"`
-	// 	//Files   []*JobFile `json:"files,omitempty"`
-	// 	Job *Job `json:"job"`
-	// }
 
 	// MailQueue defines the interface for sending mail items to a queue
 	JobQueue interface {
@@ -81,6 +72,9 @@ type (
 )
 
 const (
+	JobTypeCrispr JobType = "crispr"
+	JobTypeTest   JobType = "test"
+
 	JobFileTypeInput  JobFileType = "input"
 	JobFileTypeOutput JobFileType = "output"
 
@@ -96,23 +90,13 @@ const (
 	JobQueueItemTypeStatus JobQueueItemType = "status"
 )
 
-// func NewJobStatusQueueItem(jobID string, status JobStatus, message string, files []*JobFile) *JobStatusQueueItem {
-// 	return &JobStatusQueueItem{
-// 		ID:      jobID,
-// 		Status:  status,
-// 		Message: message,
-// 		Files:   files,
-// 		//UpdatedAt: time.Now(),
-// 	}
-// }
-
-func NewJobFile(fileType JobFileType, bucket, key, filename, contentType string, size int64, content io.ReadSeeker) *JobFile {
+func NewJobFile(fileType JobFileType, key, filename, contentType string, size int64, content io.ReadSeeker) *JobFile {
 	id := uuid.NewV7()
 
 	file := JobFile{
-		ID:          id.String(),
-		Type:        fileType,
-		Bucket:      bucket,
+		ID:   id.String(),
+		Type: fileType,
+
 		ObjectKey:   key,
 		Filename:    filename,
 		ContentType: contentType,
@@ -124,13 +108,25 @@ func NewJobFile(fileType JobFileType, bucket, key, filename, contentType string,
 	return &file
 }
 
-func NewJob(user JobUser, jobType string, files []*JobFile) *Job {
+func NewJob(user JobUser, jobType string, bucket string, files []*JobFile) *Job {
 	id := uuid.NewV7()
 
 	return &Job{
 		ID:   id.String(),
 		User: user,
 		//CreatedAt: time.Now(),
-		Files: files,
+		Bucket: bucket,
+		Files:  files,
 	}
+}
+
+// InputFiles returns all input files associated with the job.
+func (j *Job) InputFiles() []*JobFile {
+	var inputs []*JobFile
+	for _, f := range j.Files {
+		if f.Type == JobFileTypeInput {
+			inputs = append(inputs, f)
+		}
+	}
+	return inputs
 }

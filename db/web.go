@@ -33,6 +33,7 @@ const (
 		j.email, 
 		jt.name as type, 
 		js.name as status,
+		j.bucket,
 		j.created_at,
 		j.updated_at
 		FROM jobs j
@@ -49,7 +50,6 @@ const (
 		f.id,	
 		f.job_id,
 		ft.name as type,
-		f.bucket,
 		f.object_key,
 		f.filename,
 		f.content_type,
@@ -126,6 +126,7 @@ func (s *PostgresWebStore) ListJobs(ctx context.Context, userID string, page int
 			&job.User.Email,
 			&job.Type,
 			&job.Status,
+			&job.Bucket,
 			&job.CreatedAt,
 			&job.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("scan job: %w", err)
@@ -164,7 +165,6 @@ func (s *PostgresWebStore) ListJobs(ctx context.Context, userID string, page int
 			if err := fileRows.Scan(&file.ID,
 				&jobID,
 				&file.Type,
-				&file.Bucket,
 				&file.ObjectKey,
 				&file.Filename,
 				&file.ContentType,

@@ -52,8 +52,7 @@ CREATE TABLE IF NOT EXISTS jobs (
     email TEXT NOT NULL,
     name TEXT,
     description TEXT,
-    -- The type of job (e.g., "email", "crispr")
-   
+    bucket TEXT NOT NULL,
     -- The timestamp when the job was created
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -84,7 +83,7 @@ CREATE TABLE IF NOT EXISTS files (
     id uuid PRIMARY KEY DEFAULT uuidv7(),
     job_id uuid NOT NULL REFERENCES jobs(id),
     file_type_id INTEGER NOT NULL REFERENCES file_types(id) DEFAULT 1,
-    bucket TEXT NOT NULL,
+    --bucket TEXT NOT NULL,
     object_key TEXT NOT NULL,
     filename TEXT NOT NULL,
     content_type TEXT NOT NULL,
