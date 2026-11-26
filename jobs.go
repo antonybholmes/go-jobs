@@ -3,10 +3,10 @@ package jobs
 import (
 	"context"
 	"io"
-	"mime"
-	"path/filepath"
 	"time"
 	"uuid"
+
+	sysfiles "github.com/antonybholmes/go-sys/files"
 )
 
 type (
@@ -95,7 +95,7 @@ const (
 func NewJobFile(fileType JobFileType, key, filename string, size int64, content io.ReadSeeker) *JobFile {
 	id := uuid.NewV7()
 
-	contentType := mime.TypeByExtension(filepath.Ext(filename))
+	contentType := sysfiles.DetectContentType(key)
 
 	file := JobFile{
 		ID:          id.String(),

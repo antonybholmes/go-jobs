@@ -19,8 +19,8 @@ type (
 	}
 
 	JobWebStore interface {
-		CountJobs(ctx context.Context, userID string, pageSize int) (*sysdb.RecordStats, error)
-		ListJobs(ctx context.Context, userID string, page int, pageSize int) ([]*jobs.Job, error)
+		CountJobs(ctx context.Context, userID string, jobTypes []string, pageSize int) (*sysdb.RecordStats, error)
+		ListJobs(ctx context.Context, userID string, jobTypes []string, page int, pageSize int) ([]*jobs.Job, error)
 	}
 )
 
@@ -39,7 +39,7 @@ const (
 		FROM jobs j
 		JOIN job_statuses js ON j.status_id = js.id
 		JOIN job_types jt ON j.type_id = jt.id
-		WHERE j.user_id = @user_id::uuid
+		WHERE j.user_id = @user_id::uuid AND (@types::text[] IS NULL OR jt.name = ANY(@types::text[]))
 		ORDER BY 
 			jt.name DESC,
 			js.name DESC,
@@ -60,7 +60,10 @@ const (
 		JOIN file_types AS ft ON f.file_type_id = ft.id
 		WHERE f.job_id = ANY(@ids::uuid[])`
 
-	CountJobsSql = `SELECT COUNT(id) FROM jobs WHERE user_id = @user_id::uuid`
+	CountJobsSql = `SELECT COUNT(j.id) 
+		FROM jobs j
+		JOIN job_types jt ON j.type_id = jt.id
+		WHERE j.user_id = @user_id::uuid AND  (@types::text[] IS NULL OR jt.name = ANY(@types::text[]))`
 )
 
 // Store for the web compoments to list jobs etc.
@@ -79,15 +82,24 @@ func NewPostgresWebStore(ctx context.Context, databaseURL string) *PostgresWebSt
 
 // CountJobs returns the total number of jobs and pagination statistics for a given user.
 // Page size will be clamped to the range [1, PageSize].
-func (s *PostgresWebStore) CountJobs(ctx context.Context, userID string, pageSize int) (*sysdb.RecordStats, error) {
+func (s *PostgresWebStore) CountJobs(ctx context.Context,
+	userID string,
+	jobTypes []string,
+	pageSize int) (*sysdb.RecordStats, error) {
 	// Must request at least one job per page and no more than PageSize.
 	pageSize = basemath.Clamp(pageSize, 1, PageSize)
 
+	params := pgx.NamedArgs{
+		"user_id": userID,
+	}
+
+	if len(jobTypes) > 0 {
+		params["types"] = jobTypes
+	}
+
 	var count int
 
-	if err := s.pool.QueryRow(ctx, CountJobsSql, pgx.NamedArgs{
-		"user_id": userID,
-	}).Scan(&count); err != nil {
+	if err := s.pool.QueryRow(ctx, CountJobsSql, params).Scan(&count); err != nil {
 		return nil, fmt.Errorf("count jobs: %w", err)
 	}
 
@@ -100,17 +112,27 @@ func (s *PostgresWebStore) CountJobs(ctx context.Context, userID string, pageSiz
 
 // List all jobs for a given user.
 // Page size will be clamped to the range [1, PageSize].
-func (s *PostgresWebStore) ListJobs(ctx context.Context, userID string, page int, pageSize int) ([]*jobs.Job, error) {
+func (s *PostgresWebStore) ListJobs(ctx context.Context,
+	userID string,
+	jobTypes []string,
+	page int,
+	pageSize int) ([]*jobs.Job, error) {
 	// user cannot request more than PageSize jobs per page.
 	pageSize = basemath.Clamp(pageSize, 1, PageSize)
 
+	params := pgx.NamedArgs{
+		"user_id": userID,
+		"limit":   pageSize,
+		"offset":  (page - 1) * pageSize,
+	}
+
+	if len(jobTypes) > 0 {
+		params["types"] = jobTypes
+	}
+
 	rows, err := s.pool.Query(ctx,
 		ListJobsSql,
-		pgx.NamedArgs{
-			"user_id": userID,
-			"limit":   pageSize,
-			"offset":  (page - 1) * pageSize,
-		})
+		params)
 
 	if err != nil {
 		return nil, fmt.Errorf("list jobs: %w", err)

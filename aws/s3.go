@@ -102,7 +102,7 @@ func MakeS3RandInputKey(job *jobs.Job, filename string) string {
 	//id := sys.NanoId()
 
 	// Use approved file extension for the uploaded file
-	ext := sysfiles.DetectFileExtension(filename)
+	ext := sysfiles.FileExtOr(filename, "txt")
 
 	return MakeS3JobKey(job) + "/inputs/" + id.String() + "." + ext
 }
@@ -118,7 +118,7 @@ func MakeS3JobFileRandOutputKey(job *jobs.Job, filename string) string {
 	id := uuid.NewV7()
 
 	// Use approved file extension for the uploaded file
-	ext := sysfiles.DetectFileExtension(filename)
+	ext := sysfiles.FileExtOr(filename, "txt")
 	return MakeS3JobKey(job) + "/outputs/" + id.String() + "." + ext
 }
 
