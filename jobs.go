@@ -3,6 +3,8 @@ package jobs
 import (
 	"context"
 	"io"
+	"mime"
+	"path/filepath"
 	"time"
 	"uuid"
 )
@@ -23,16 +25,16 @@ type (
 	}
 
 	JobFile struct {
-		CreatedAt time.Time     `json:"createdAt"`
-		UpdatedAt time.Time     `json:"updatedAt"`
-		Content   io.ReadSeeker `json:"-"`
-		ID        string        `json:"id"`
-		Type      JobFileType   `json:"type"`
+		ID   string      `json:"id"`
+		Type JobFileType `json:"type"`
 		//Bucket      string     `json:"-"`
-		ObjectKey   string `json:"objectKey"`
-		Filename    string `json:"filename"`
-		ContentType string `json:"contentType"`
-		Size        int64  `json:"size"`
+		ObjectKey   string        `json:"objectKey"`
+		Filename    string        `json:"filename"`
+		ContentType string        `json:"contentType"`
+		CreatedAt   time.Time     `json:"createdAt"`
+		UpdatedAt   time.Time     `json:"updatedAt"`
+		SizeBytes   int64         `json:"sizeBytes"`
+		Content     io.ReadSeeker `json:"-"`
 	}
 
 	// Job represents a unit of work to be processed.
@@ -90,17 +92,18 @@ const (
 	JobQueueItemTypeStatus JobQueueItemType = "status"
 )
 
-func NewJobFile(fileType JobFileType, key, filename, contentType string, size int64, content io.ReadSeeker) *JobFile {
+func NewJobFile(fileType JobFileType, key, filename string, size int64, content io.ReadSeeker) *JobFile {
 	id := uuid.NewV7()
 
-	file := JobFile{
-		ID:   id.String(),
-		Type: fileType,
+	contentType := mime.TypeByExtension(filepath.Ext(filename))
 
+	file := JobFile{
+		ID:          id.String(),
+		Type:        fileType,
 		ObjectKey:   key,
 		Filename:    filename,
 		ContentType: contentType,
-		Size:        size,
+		SizeBytes:   size,
 		//CreatedAt:   time.Now(),
 		Content: content,
 	}
@@ -128,5 +131,27 @@ func (j *Job) InputFiles() []*JobFile {
 			inputs = append(inputs, f)
 		}
 	}
+
 	return inputs
+}
+
+func (j *Job) OutputFiles() []*JobFile {
+	var outputs []*JobFile
+	for _, f := range j.Files {
+		if f.Type == JobFileTypeOutput {
+			outputs = append(outputs, f)
+		}
+	}
+
+	return outputs
+}
+
+func (j *Job) Copy() *Job {
+	newJob := *j
+	newJob.Files = make([]*JobFile, len(j.Files))
+	for i, f := range j.Files {
+		newFile := *f
+		newJob.Files[i] = &newFile
+	}
+	return &newJob
 }

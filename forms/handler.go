@@ -79,12 +79,11 @@ func (h *SubmitHandler) SubmitJob(c *gin.Context) error {
 	}
 
 	for _, formFile := range formFiles {
-		key := aws.MakeUploadKey(&job, formFile.Filename)
+		key := aws.MakeS3UploadKey(&job, formFile.Filename)
 
 		jobFile := jobs.NewJobFile(jobs.JobFileTypeInput,
 			key,
 			formFile.Filename,
-			formFile.ContentType,
 			formFile.Size,
 			formFile.Content,
 		)

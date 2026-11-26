@@ -168,7 +168,7 @@ func (s *PostgresWebStore) ListJobs(ctx context.Context, userID string, page int
 				&file.ObjectKey,
 				&file.Filename,
 				&file.ContentType,
-				&file.Size,
+				&file.SizeBytes,
 				&file.CreatedAt,
 				&file.UpdatedAt); err != nil {
 				return nil, fmt.Errorf("scan job file: %w", err)

@@ -69,7 +69,7 @@ func (s *S3JobStore) UploadJobFile(ctx context.Context, file *jobs.JobFile) erro
 		return fmt.Errorf("file content is empty")
 	}
 
-	if err := s.s3Store.Upload(ctx, file.Content, file.ObjectKey, file.ContentType); err != nil {
+	if err := s.s3Store.Upload(ctx, file.Content, file.ObjectKey); err != nil {
 		return fmt.Errorf("upload file %s to S3: %w", file.ObjectKey, err)
 	}
 
@@ -93,33 +93,37 @@ func (s *S3JobStore) DownloadJobFileLocal(ctx context.Context, file *jobs.JobFil
 	return path, nil
 }
 
-func MakeUploadKey(job *jobs.Job, filename string) string {
+func MakeS3UploadKey(job *jobs.Job, filename string) string {
+	return MakeS3JobKey(job) + "/inputs/" + filename
+}
+
+func MakeS3RandUploadKey(job *jobs.Job, filename string) string {
 	id := uuid.NewV7()
 	//id := sys.NanoId()
 
 	// Use approved file extension for the uploaded file
 	ext := sysfiles.DetectFileExtension(filename)
 
-	return MakeS3JobKey(job, filename) + "/uploads/" + id.String() + "." + ext
+	return MakeS3JobKey(job) + "/inputs/" + id.String() + "." + ext
 }
 
 // MakeS3JobFileOutputKey generates the S3 key for storing output files of a job.
 // Files are given a unique identifier with a matching file extension.
 func MakeS3JobFileOutputKey(job *jobs.Job, filename string) string {
+
+	return MakeS3JobKey(job) + "/outputs/" + filename
+}
+
+func MakeS3RandJobFileOutputKey(job *jobs.Job, filename string) string {
 	id := uuid.NewV7()
 	//id := sys.NanoId()
 
 	// Use approved file extension for the uploaded file
 	ext := sysfiles.DetectFileExtension(filename)
-	return MakeS3JobKey(job, filename) + "/downloads/" + id.String() + "." + ext
-}
-
-// MakeS3JobFileExactOutputKey generates the S3 key for storing an output file of a job using the files name
-func MakeS3JobFileExactOutputKey(job *jobs.Job, filename string) string {
-	return MakeS3JobKey(job, filename) + "/downloads/" + filepath.Base(filename)
+	return MakeS3JobKey(job) + "/outputs/" + id.String() + "." + ext
 }
 
 // The base key for a user's job in S3 storage. We store all files related to the job under this key.
-func MakeS3JobKey(job *jobs.Job, filename string) string {
+func MakeS3JobKey(job *jobs.Job) string {
 	return "users/" + job.User.ID + "/jobs/" + string(job.Type) + "/" + job.ID
 }

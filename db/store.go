@@ -295,7 +295,7 @@ func insertJobFiles(ctx context.Context, tx pgx.Tx, jobID string, files []*jobs.
 					"object_key":   file.ObjectKey,
 					"filename":     file.Filename,
 					"content_type": file.ContentType,
-					"size_bytes":   file.Size,
+					"size_bytes":   file.SizeBytes,
 				})
 
 			if err != nil {
