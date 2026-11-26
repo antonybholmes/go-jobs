@@ -9,8 +9,8 @@ import (
 	"uuid"
 
 	"github.com/antonybholmes/go-jobs"
-	"github.com/antonybholmes/go-sys"
 	awssys "github.com/antonybholmes/go-sys/aws"
+	sysfiles "github.com/antonybholmes/go-sys/files"
 )
 
 type (
@@ -98,7 +98,7 @@ func MakeUploadKey(job *jobs.Job, filename string) string {
 	//id := sys.NanoId()
 
 	// Use approved file extension for the uploaded file
-	ext := sys.DetectFileExtension(filename)
+	ext := sysfiles.DetectFileExtension(filename)
 
 	return MakeS3JobKey(job, filename) + "/uploads/" + id.String() + "." + ext
 }
@@ -110,7 +110,7 @@ func MakeS3JobFileOutputKey(job *jobs.Job, filename string) string {
 	//id := sys.NanoId()
 
 	// Use approved file extension for the uploaded file
-	ext := sys.DetectFileExtension(filename)
+	ext := sysfiles.DetectFileExtension(filename)
 	return MakeS3JobKey(job, filename) + "/downloads/" + id.String() + "." + ext
 }
 
