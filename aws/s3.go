@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"path"
 	"path/filepath"
 	"strings"
 	"uuid"
@@ -94,7 +95,7 @@ func (s *S3JobStore) DownloadJobFileLocal(ctx context.Context, file *jobs.JobFil
 }
 
 func MakeS3InputKey(job *jobs.Job, filename string) string {
-	return MakeS3JobKey(job) + "/inputs/" + filename
+	return path.Join(MakeS3JobKey(job), "inputs", filename)
 }
 
 func MakeS3RandInputKey(job *jobs.Job, filename string) string {
@@ -104,13 +105,13 @@ func MakeS3RandInputKey(job *jobs.Job, filename string) string {
 	// Use approved file extension for the uploaded file
 	ext := sysfiles.FileExtOr(filename, "txt")
 
-	return MakeS3JobKey(job) + "/inputs/" + id.String() + "." + ext
+	return path.Join(MakeS3JobKey(job), "inputs", id.String()+"."+ext)
 }
 
 // MakeS3JobFileOutputKey generates the S3 key for storing output files of a job.
 
 func MakeS3JobFileOutputKey(job *jobs.Job, filename string) string {
-	return MakeS3JobKey(job) + "/outputs/" + filename
+	return path.Join(MakeS3JobKey(job), "outputs", filename)
 }
 
 // Files are given a unique identifier with a matching file extension.
@@ -119,10 +120,10 @@ func MakeS3JobFileRandOutputKey(job *jobs.Job, filename string) string {
 
 	// Use approved file extension for the uploaded file
 	ext := sysfiles.FileExtOr(filename, "txt")
-	return MakeS3JobKey(job) + "/outputs/" + id.String() + "." + ext
+	return path.Join(MakeS3JobKey(job), "outputs", id.String()+"."+ext)
 }
 
 // The base key for a user's job in S3 storage. We store all files related to the job under this key.
 func MakeS3JobKey(job *jobs.Job) string {
-	return "users/" + job.User.ID + "/jobs/" + string(job.Type) + "/" + job.ID
+	return path.Join("users", job.User.ID, string(job.Type), job.ID)
 }

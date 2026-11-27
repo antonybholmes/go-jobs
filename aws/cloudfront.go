@@ -18,7 +18,7 @@ func NewCloudFrontJobStore(cloudfrontStore *awssys.CloudFrontStore) *CloudFrontJ
 	}
 }
 
-// Generate a url for allowing file downloads
-func (s *CloudFrontJobStore) GenerateJobFileUrl(file *jobs.JobFile) (*awssys.SignedURL, error) {
-	return s.cloudfrontStore.OneHourSignedURL(file.ObjectKey)
+// Generate a presigned url for a job file valid for 1 hour
+func (s *CloudFrontJobStore) JobFileOneHourPresignedUrl(file *jobs.JobFile) (*awssys.SignedURL, error) {
+	return s.cloudfrontStore.OneHourPresignedURL(file.ObjectKey)
 }

@@ -28,7 +28,7 @@ type (
 		ID   string      `json:"id"`
 		Type JobFileType `json:"type"`
 		//Bucket      string     `json:"-"`
-		ObjectKey   string        `json:"objectKey"`
+		ObjectKey   string        `json:"-"`
 		Filename    string        `json:"filename"`
 		ContentType string        `json:"contentType"`
 		CreatedAt   time.Time     `json:"createdAt"`

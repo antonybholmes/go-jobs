@@ -5,6 +5,8 @@ import (
 	"fmt"
 
 	"github.com/antonybholmes/go-jobs"
+	awsjobs "github.com/antonybholmes/go-jobs/aws"
+	awssys "github.com/antonybholmes/go-sys/aws"
 	sysdb "github.com/antonybholmes/go-sys/db"
 	"github.com/antonybholmes/go-sys/log"
 	basemath "github.com/antonybholmes/go-sys/math"
@@ -14,13 +16,15 @@ import (
 
 type (
 	PostgresWebStore struct {
-		emailQueue jobs.MailQueue
-		pool       *pgxpool.Pool
+		pool               *pgxpool.Pool
+		cloudFrontJobStore *awsjobs.CloudFrontJobStore
 	}
 
 	JobWebStore interface {
 		CountJobs(ctx context.Context, userID string, jobTypes []string, pageSize int) (*sysdb.RecordStats, error)
 		ListJobs(ctx context.Context, userID string, jobTypes []string, page int, pageSize int) ([]*jobs.Job, error)
+		FindJobFileById(ctx context.Context, userID string, jobID string) (*jobs.JobFile, error)
+		JobFileOneHourPresignedUrl(ctx context.Context, userID string, jobFileID string) (*awssys.SignedURL, error)
 	}
 )
 
@@ -60,6 +64,22 @@ const (
 		JOIN file_types AS ft ON f.file_type_id = ft.id
 		WHERE f.job_id = ANY(@ids::uuid[])`
 
+	// Must be a valid job file ID and belong to the specified user.
+	JobFileSql = `SELECT
+		f.id,	
+		f.job_id,
+		ft.name as type,
+		f.object_key,
+		f.filename,
+		f.content_type,
+		f.size_bytes,
+		f.created_at,
+		f.updated_at
+		FROM files AS f
+		JOIN file_types AS ft ON f.file_type_id = ft.id
+		JOIN jobs j ON f.job_id = j.id
+		WHERE f.job_id = @id::uuid AND j.user_id = @user_id::uuid`
+
 	CountJobsSql = `SELECT COUNT(j.id) 
 		FROM jobs j
 		JOIN job_types jt ON j.type_id = jt.id
@@ -67,8 +87,11 @@ const (
 )
 
 // Store for the web compoments to list jobs etc.
-// This is designed for read only access
-func NewPostgresWebStore(ctx context.Context, databaseURL string) *PostgresWebStore {
+// This is designed for read only access and to generate
+// links to job files via presigned URLs.
+func NewPostgresWebStore(ctx context.Context,
+	databaseURL string,
+	cloudFrontJobStore *awsjobs.CloudFrontJobStore) *PostgresWebStore {
 	pool, err := pgxpool.New(ctx, databaseURL)
 
 	if err != nil {
@@ -76,7 +99,8 @@ func NewPostgresWebStore(ctx context.Context, databaseURL string) *PostgresWebSt
 	}
 
 	return &PostgresWebStore{
-		pool: pool,
+		pool:               pool,
+		cloudFrontJobStore: cloudFrontJobStore,
 	}
 }
 
@@ -205,4 +229,47 @@ func (s *PostgresWebStore) ListJobs(ctx context.Context,
 	}
 
 	return jobList, nil
+}
+
+func (s *PostgresWebStore) FindJobFileById(ctx context.Context,
+	userID string,
+	jobFileID string) (*jobs.JobFile, error) {
+	row := s.pool.QueryRow(ctx, JobFileSql, pgx.NamedArgs{
+		"user_id": userID,
+		"id":      jobFileID,
+	})
+
+	var file jobs.JobFile
+	var jobIDScan string
+	if err := row.Scan(&file.ID,
+		&jobIDScan,
+		&file.Type,
+		&file.ObjectKey,
+		&file.Filename,
+		&file.ContentType,
+		&file.SizeBytes,
+		&file.CreatedAt,
+		&file.UpdatedAt); err != nil {
+
+		return nil, fmt.Errorf("find job file by id: %w", err)
+	}
+
+	return &file, nil
+}
+
+func (s *PostgresWebStore) JobFileOneHourPresignedUrl(ctx context.Context,
+	userID string,
+	jobFileID string) (*awssys.SignedURL, error) {
+
+	file, err := s.FindJobFileById(ctx, userID, jobFileID)
+	if err != nil {
+		return nil, fmt.Errorf("generate presigned URL: %w", err)
+	}
+
+	signedURL, err := s.cloudFrontJobStore.JobFileOneHourPresignedUrl(file)
+	if err != nil {
+		return nil, fmt.Errorf("generate presigned URL: %w", err)
+	}
+
+	return signedURL, nil
 }
