@@ -37,13 +37,7 @@ type (
 )
 
 const (
-	EmailTypeJob          EmailType = "job"
-	EmailTypeJobQueued    EmailType = "job-queued"
-	EmailTypeJobStarted   EmailType = "job-started"
-	EmailTypeJobError     EmailType = "job-error"
-	EmailTypeJobCancelled EmailType = "job-cancelled"
-	EmailTypeJobFailed    EmailType = "job-failed"
-	EmailTypeJobCompleted EmailType = "job-completed"
+	EmailTypeJob EmailType = "job"
 )
 
 func NewJobMailItem(job *Job) *MailQueueItem {
